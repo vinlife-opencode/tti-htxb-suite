@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Htxb.P2DataAnalysisTime</RootNamespace>
+    <AssemblyName>Htxb.P2DataAnalysisTime</AssemblyName>
+    <Version>6.10.302.0</Version>
+    <FileVersion>6.10.302.0</FileVersion>
+    <ApplicationIcon>Resources\Favicon.ico</ApplicationIcon>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Htxb.Host\Htxb.Host.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\index.html" LogicalName="index.html" />
+    <EmbeddedResource Include="Resources\polyfill.js" LogicalName="polyfill.js" />
+  </ItemGroup>
+
+</Project>

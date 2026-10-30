@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RecipeCore - recipe workbook / .zadz / std_table model for the BiDF pipeline.
+
+    Deliberately PACKAGE-FREE. Reading .xlsx needs only System.IO.Compression
+    (zip) and System.Xml.Linq (xml), both in-box on .NET 8 AND on .NET Framework
+    4.8, so this source set still compiles under the Framework csc.exe if the
+    tool ever has to ship inside the offline installer. Keep it that way: no
+    NuGet, no Windows Forms, no System.Drawing.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Htxb.RecipeCore</RootNamespace>
+    <AssemblyName>Htxb.RecipeCore</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Ships inside Htxb.RecipeTool, so it carries that tool's version. -->
+    <Version>6.10.301.0</Version>
+    <FileVersion>6.10.301.0</FileVersion>
+  </PropertyGroup>
+
+</Project>

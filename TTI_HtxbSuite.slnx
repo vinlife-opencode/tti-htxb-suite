@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Htxb.Host/Htxb.Host.csproj" />
+    <Project Path="src/Htxb.LotExtractor/Htxb.LotExtractor.csproj" />
+    <Project Path="src/Htxb.TempUniformity/Htxb.TempUniformity.csproj" />
+    <Project Path="src/Htxb.BiDFAnalysis/Htxb.BiDFAnalysis.csproj" />
+    <Project Path="src/Htxb.RecipeTranslator/Htxb.RecipeTranslator.csproj" />
+    <Project Path="src/Htxb.RcpStdTable/Htxb.RcpStdTable.csproj" />
+    <Project Path="src/Htxb.P2DataAnalysis/Htxb.P2DataAnalysis.csproj" />
+    <Project Path="src/Htxb.Launcher/Htxb.Launcher.csproj" />
+    <Project Path="src/Htxb.BarcodeGenerator/Htxb.BarcodeGenerator.csproj" />
+  </Folder>
+</Solution>

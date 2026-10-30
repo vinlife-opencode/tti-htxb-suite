@@ -1,0 +1,68 @@
+﻿{
+  "version": 1,
+  "generated": "2026-10-30",
+  "tools": {
+    "launcher": {
+      "name": "Tools & Utilities",
+      "exe": "TTI_Utils_Launcher.exe",
+      "version": "6.10.251.0",
+      "source": "TTI HTXB Tools & Utilities.html"
+    },
+    "lot-extractor": {
+      "name": "Lot Extractor",
+      "exe": "TTI_LotExtractor.exe",
+      "version": "6.10.91.0",
+      "source": "TTI COBIS-II HTXB Lot Extractor.html"
+    },
+    "temp-uniformity": {
+      "name": "Temp Uniformity Graph",
+      "exe": "TTI_TempUniformity.exe",
+      "version": "6.10.92.0",
+      "source": "TTI Temp_Uniformity_Graph.html"
+    },
+    "bidf-analysis": {
+      "name": "BiDF File Analysis",
+      "exe": "TTI_BiDFAnalysis.exe",
+      "version": "6.10.302.0",
+      "source": "TTI COBIS-II HTXB BiDF Analysis.html"
+    },
+    "recipe-translator": {
+      "name": "Recipe Translator",
+      "exe": "TTI_RecipeTranslator.exe",
+      "version": "6.10.151.0",
+      "source": "TTI COBIS-II HTXB Recipe Translator.html"
+    },
+    "rcp-std-table": {
+      "name": "Recipe-to-Std Table",
+      "exe": "TTI_RcpStdTable.exe",
+      "version": "6.10.91.0",
+      "source": "TTI HTXB Rcp_Std_Table.html"
+    },
+    "p2-analysis": {
+      "name": "P2 Data Analysis",
+      "exe": "TTI_P2DataAnalysis.exe",
+      "version": "6.10.91.0",
+      "source": "TTI HTXB_P2 Data Analysis.html"
+    },
+    "p2-analysis-time": {
+      "name": "P2 Data Analysis - Time",
+      "exe": "TTI_P2DataAnalysisTime.exe",
+      "version": "6.10.302.0",
+      "source": "src/Htxb.P2DataAnalysisTime/Resources/index.html"
+    },
+    "barcode-generator": {
+      "name": "Barcode Generator",
+      "exe": "TTI_BarcodeGenerator.exe",
+      "version": "6.10.91.0",
+      "source": "src/Htxb.BarcodeGenerator/Resources/index.html"
+    }
+  },
+  "libs": {
+    "xlsx.full.min.js":  { "version": "0.18.5",    "usedBy": ["temp-uniformity"] },
+    "xlsx-js-style.min.js": { "version": "1.2.0",  "usedBy": ["bidf-analysis", "recipe-translator", "rcp-std-table", "p2-analysis", "p2-analysis-time"] },
+    "chart.umd.min.js": { "version": "4.4.1",      "usedBy": ["temp-uniformity", "bidf-analysis", "p2-analysis-time"] },
+    "sql-wasm.js":     { "version": "1.8.0",       "usedBy": ["bidf-analysis", "p2-analysis-time"] },
+    "sql-wasm.wasm":   { "version": "1.8.0",       "usedBy": ["bidf-analysis", "p2-analysis-time"] },
+    "jsbarcode.all.min.js": { "version": "3.11.6", "usedBy": ["launcher"] }
+  }
+}

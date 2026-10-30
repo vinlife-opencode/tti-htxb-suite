@@ -1,0 +1,15 @@
+bin/
+obj/
+dist/
+dist-recipetool/
+*.user
+.vs/
+
+# Vendor runtime installer (~58 MB): installed on the PC, not source.
+WebView Runtime Installation/
+
+# Scratch output of a processed lot (BiDF / RPT / CSV / summaries), not source.
+Updated lot proccessed files/
+
+# Written by the Launcher on its first run; holds machine hardware ids.
+configuration/pc_info.ini

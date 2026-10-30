@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TTI Barcode Generator</title>
+  <script src="libs/jsbarcode.all.min.js"></script>
+  <style>
+    :root {
+      --bg: #f3f3f3;
+      --card-bg: #fff;
+      --card-border: #e5e5e5;
+      --accent: #0067c0;
+      --accent-hover: #005a9e;
+      --success: #006100;
+      --danger: #a80000;
+      --text: #202020;
+      --text-sec: #5f5f5f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header {
+      padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;
+      background: #fff; border-bottom: 1px solid #e0e0e0; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .logo-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .logo-tag { font-size: 11px; background: #f3f3f3; border: 1px solid #d2d2d2; padding: 2px 8px; border-radius: 4px; color: var(--text-sec); }
+    .main { flex: 1; padding: 24px; max-width: 620px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    .card {
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px;
+      padding: 20px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .card-title { font-size: 15px; font-weight: 600; }
+    .card-sub { font-size: 12px; color: var(--text-sec); margin: 2px 0 12px; }
+    #bc-input {
+      width: 100%; font-size: 14px; padding: 8px 10px;
+      border: 1px solid #c8c8c8; border-radius: 6px;
+    }
+    #bc-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+    #bc-err { color: var(--danger); font-size: 12px; min-height: 18px; margin: 4px 0; }
+    .preview {
+      border: 1px solid var(--card-border); border-radius: 8px; padding: 12px;
+      display: flex; justify-content: center; background: #fff; overflow-x: auto;
+    }
+    .preview canvas { max-width: 100%; }
+    #bc-msg { font-size: 12px; color: var(--success); min-height: 18px; margin: 4px 0; word-break: break-all; }
+    #bc-export {
+      width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 6px;
+      padding: 10px 0; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    #bc-export:hover { background: var(--accent-hover); }
+    #bc-export:disabled { background: #c8c8c8; cursor: default; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-title">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5v14M7.5 5v14M11 5v14M12.5 5v14M16 5v14M19.5 5v14"/></svg>
+      TTI Barcode Generator
+      <span class="logo-tag"></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="card">
+      <div class="card-title">Code 128 Barcode</div>
+      <div class="card-sub">Scanner data entry · max 50 characters · black on white · PNG ≤ 50 KB → Downloads</div>
+      <input id="bc-input" maxlength="50" placeholder="e.g. P_TM_BRF9_B_05_4_32" autocomplete="off" spellcheck="false">
+      <div id="bc-err"></div>
+      <div class="preview"><canvas id="bc-canvas"></canvas></div>
+      <div id="bc-msg"></div>
+      <button id="bc-export" type="button">Export PNG</button>
+    </div>
+  </main>
+</body>
+</html>

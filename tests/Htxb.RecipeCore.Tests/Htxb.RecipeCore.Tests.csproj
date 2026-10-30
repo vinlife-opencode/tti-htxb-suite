@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Test runner for RecipeCore.
+
+    A plain console EXE with an exit code, like the rest of this suite's checks:
+    no test framework, no NuGet, nothing to restore on a plant PC.
+    "dotnet run" on this project is the whole story, and a non-zero exit is the
+    only signal a caller has to understand.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Htxb.RecipeCore.Tests</RootNamespace>
+    <AssemblyName>Htxb.RecipeCore.Tests</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Htxb.RecipeCore\Htxb.RecipeCore.csproj" />
+  </ItemGroup>
+
+</Project>

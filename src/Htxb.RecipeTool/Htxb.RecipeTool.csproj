@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RecipeTool - the console front end for RecipeCore.
+
+    Same package-free rule as RecipeCore: this must stay buildable with nothing
+    but the SDK (and, if it ever has to ship offline, with the .NET Framework
+    csc.exe), so an operator on a plant PC can run the audit without an installer.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Htxb.RecipeTool</RootNamespace>
+    <AssemblyName>Htxb.RecipeTool</AssemblyName>
+    <Version>6.10.301.0</Version>
+    <FileVersion>6.10.301.0</FileVersion>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Htxb.RecipeCore\Htxb.RecipeCore.csproj" />
+  </ItemGroup>
+
+</Project>

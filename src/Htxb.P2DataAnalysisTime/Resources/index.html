@@ -1,0 +1,2098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TTI P2 Data Analysis - Time</title>
+  <link rel="icon" href="assets/Favicon.ico" type="image/x-icon">
+  <script src="libs/sql-wasm.js"></script>
+  <script src="libs/xlsx-js-style.min.js"></script>
+  <script src="libs/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f3f3f3; --card-bg: #fff; --card-border: #e5e5e5;
+      --accent: #0067c0; --accent-hover: #005a9e;
+      --success: #107c41; --success-bg: #c6efce;
+      --danger: #a80000; --danger-bg: #f8cbcd;
+      --warning: #d83b01;
+      --text: #202020; --text-sec: #5f5f5f; --text-muted: #8a8886;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;
+      background: #fff; border-bottom: 1px solid #e0e0e0; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+    .logo-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .logo-tag { font-size: 11px; background: #f3f3f3; border: 1px solid #d2d2d2; padding: 2px 8px; border-radius: 4px; color: var(--text-sec); }
+    .main { flex: 1; padding: 16px 18px; max-width: 1400px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+    .btn { background: var(--accent); color: #fff; border: 1px solid rgba(0,0,0,0.1); padding: 7px 18px; border-radius: 4px;
+      font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: .15s; }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:disabled { background: #e0e0e0; color: #a0a0a0; cursor: not-allowed; }
+    .btn-sec { background: #fff; color: var(--text); border: 1px solid #d2d2d2; padding: 7px 16px; border-radius: 4px;
+      font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-sec:hover { background: #f3f3f3; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* Folder pickers */
+    .pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .pick-card { background: var(--card-bg); border: 1px dashed #b5b5b5; border-radius: 8px; padding: 22px;
+      display: flex; flex-direction: column; gap: 10px; min-height: 190px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .pick-card.dragover { border-color: var(--accent); border-style: solid; background: #fdfdfd; }
+    .pick-card.loaded { border-style: solid; border-color: #c8e0f5; }
+    .pick-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+    .pick-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: #eaf3fb; color: var(--accent); }
+    .pick-tag.b { background: #fdf0e6; color: #a35000; }
+    .pick-path { font-size: 12px; color: var(--text-sec); word-break: break-all; min-height: 32px;
+      background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 6px 8px; }
+    .pick-desc { font-size: 12px; color: var(--text-sec); line-height: 1.5; }
+    .pick-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pick-count { font-size: 12px; color: var(--success); font-weight: 600; margin-left: auto; }
+
+    /* Compact pick row: stays visible above the dashboard so either folder can
+       be swapped (and dropped on) without reloading both. */
+    .pick-row.compact .pick-card { padding: 12px 14px; min-height: 0; gap: 7px; }
+    .pick-row.compact .pick-desc { display: none; }
+    .pick-row.compact .pick-path { min-height: 0; }
+    .pick-row.compact .pick-head { font-size: 13.5px; }
+    .pick-status { display: none; font-size: 12.5px; font-weight: 600; color: var(--warning); padding: 6px 2px; }
+    .pick-status.ok { color: var(--success); }
+
+    .dash { display: none; flex-direction: column; gap: 18px; }
+    .action-bar { background: var(--card-bg); border: 1px solid var(--card-border); padding: 12px 18px; border-radius: 8px;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .action-info { font-size: 13px; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+    .meta-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 14px 18px; }
+    .meta-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-sec); margin-bottom: 6px; }
+    .meta-val { font-size: 20px; font-weight: 600; }
+    .meta-sub { font-size: 12px; color: var(--text-sec); margin-top: 4px; }
+
+    .section { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; }
+    .section-title { padding: 10px 16px; font-size: 14px; font-weight: 600; background: #fafafa; border-bottom: 1px solid var(--card-border);
+      display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+    .section-body { padding: 0; overflow-x: auto; }
+    .badge { background: #e0e0e0; padding: 1px 7px; border-radius: 4px; font-size: 11px; color: var(--text-sec); font-weight: 600; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    thead { position: sticky; top: 0; background: #f3f3f3; z-index: 1; }
+    th { padding: 7px 10px; font-weight: 600; border-right: 1px solid #d2d2d2; border-bottom: 1px solid #d2d2d2;
+      white-space: nowrap; font-size: 11.5px; text-align: left; }
+    td { padding: 5px 10px; border-right: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
+    tr:hover td { background: #f9fbfd; }
+    .cell-pass { background: #e8f6ec !important; color: #006100 !important; }
+    .cell-fail { background: #fbe9ea !important; color: #9c0006 !important; font-weight: 600; }
+    .cell-na { color: var(--text-muted) !important; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .chart-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; }
+    .chart-box { padding: 12px; height: 320px; position: relative; }
+    .chart-box.tall { height: 360px; }
+
+    .tol-bar { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px 16px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 12.5px; }
+    .tol-bar label { display: flex; align-items: center; gap: 6px; color: var(--text-sec); }
+    .tol-bar input[type=number] { width: 70px; padding: 4px 6px; border: 1px solid #d2d2d2; border-radius: 4px; font-size: 12.5px; }
+    .tol-bar .spacer { flex: 1; }
+
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100;
+      align-items: center; justify-content: center; }
+    .progress-box { background: #fff; border-radius: 8px; padding: 24px; max-width: 460px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+    .progress-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+    .progress-bar { background: #e0e0e0; height: 6px; border-radius: 3px; overflow: hidden; width: 100%; margin-bottom: 10px; }
+    .progress-fill { background: var(--accent); height: 100%; width: 0%; border-radius: 3px; transition: width .15s ease; }
+    .progress-status { font-size: 12px; color: var(--text-sec); display: flex; justify-content: space-between; gap: 12px; }
+
+    .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+    .toast { background: #fff; border: 1px solid #d2d2d2; border-left: 4px solid var(--accent); border-radius: 4px;
+      padding: 10px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); font-size: 13px; min-width: 280px; max-width: 520px; }
+    .toast.success { border-left-color: var(--success); }
+    .toast.danger { border-left-color: var(--danger); }
+    .toast.warning { border-left-color: var(--warning); }
+
+    .note { font-size: 12px; color: var(--text-sec); padding: 8px 16px; border-top: 1px solid #f0f0f0; line-height: 1.5; }
+    .flag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 4px; margin: 0 4px 2px 0; }
+    .flag-ok { background: var(--success-bg); color: #006100; }
+    .flag-warn { background: #fff4ce; color: #8a6d00; }
+    .flag-bad { background: var(--danger-bg); color: #9c0006; }
+    .inline-select { padding: 5px 8px; border: 1px solid #d2d2d2; border-radius: 4px; font-size: 12.5px; background: #fff; }
+    .scroll-y { max-height: 460px; overflow: auto; }
+
+    /* EDA preset support: the Preset column is editable for EDA runs only.
+       Estimating / editing never engages on COBIS runs, so their tables and
+       toolbar look exactly as they always have. */
+    .preset-bar { display: none; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px;
+      color: var(--text-sec); padding: 8px 16px; border-bottom: 1px solid var(--card-border); background: #fcfcfc; }
+    .preset-bar label { display: flex; align-items: center; gap: 5px; }
+    .preset-bar input[type=number] { width: 68px; padding: 3px 6px; border: 1px solid #d2d2d2; border-radius: 4px; font-size: 12px; }
+    .preset-bar-title { font-weight: 700; color: var(--text); }
+    .preset-sep { width: 1px; height: 18px; background: #dcdcdc; }
+    .preset-report { font-size: 12px; color: var(--text-sec); margin-left: auto; }
+    .preset-report .est { color: #a35000; }
+    .preset-cell { padding: 1px 4px; }
+    .preset-input { width: 64px; padding: 1px 4px; border: 1px solid transparent; border-radius: 3px;
+      background: transparent; color: inherit; font: inherit; text-align: right; font-variant-numeric: tabular-nums; }
+    .preset-input::-webkit-inner-spin-button, .preset-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .preset-input:hover { border-color: #d2d2d2; }
+    .preset-input:focus { border-color: var(--accent); background: #fff; outline: none; }
+    .preset-estimate { color: #8a6d00 !important; }
+    .preset-estimate .preset-input { background: #fff4ce; }
+    .preset-manual { color: #005a9e !important; }
+    .preset-manual .preset-input { background: #e8f1fa; }
+    .preset-tilde { color: #a35000; font-weight: 700; margin-right: 1px; }
+    .preset-legend { color: var(--text-muted); }
+
+    /* Print / PDF: keep the report, drop the chrome. */
+    .print-only { display: none; }
+    @media print {
+      body { background: #fff; }
+      header, .action-bar, .tol-bar, #pick-screen, .pick-row, .pick-status, .toast-container, .overlay, .no-print { display: none !important; }
+      .main { padding: 0; max-width: none; gap: 10px; }
+      .print-only { display: block !important; }
+      .section, .chart-card, .meta-card { border: 1px solid #ccc; box-shadow: none; break-inside: avoid; }
+      .section-body, .scroll-y { overflow: visible !important; max-height: none !important; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .chart-box { height: 300px; }
+      table { font-size: 10.5px; }
+      thead { position: static; }
+      /* Editable preset cells print as plain numbers; the "~" marker stays. */
+      .preset-bar { display: none !important; }
+      .preset-input { border: none !important; background: transparent !important; width: auto !important; }
+      .preset-estimate, .preset-manual { color: inherit !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-title">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      TTI P2 Data Analysis &ndash; Time
+      <span class="logo-tag">V1.0</span>
+    </div>
+    <div id="header-actions" style="display:none;">
+      <button class="btn-sec btn-sm" onclick="resetApp()">Load New Folders</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- ===================== Folder selection ===================== -->
+    <div id="pick-screen">
+      <div class="pick-row" id="pick-row">
+        <div class="pick-card" id="pick-a" data-slot="A">
+          <div class="pick-head"><span class="pick-tag">A</span> Reference folder</div>
+          <div class="pick-desc">Baseline runs. Drop a folder here or pick one &mdash; the tool finds every
+            <strong>*.bidf.gz</strong> / <strong>*.bidf</strong> inside it (recursively).</div>
+          <div class="pick-path" id="path-a">&mdash;</div>
+          <div class="pick-actions">
+            <button class="btn btn-sm" onclick="pickFolder('A')">Select Folder A</button>
+            <span class="pick-count" id="count-a"></span>
+          </div>
+        </div>
+        <div class="pick-card" id="pick-b" data-slot="B">
+          <div class="pick-head"><span class="pick-tag b">B</span> Candidate folder</div>
+          <div class="pick-desc">Runs to compare against A &mdash; another slot, another lot, or another customer state.</div>
+          <div class="pick-path" id="path-b">&mdash;</div>
+          <div class="pick-actions">
+            <button class="btn btn-sm" onclick="pickFolder('B')">Select Folder B</button>
+            <span class="pick-count" id="count-b"></span>
+          </div>
+        </div>
+      </div>
+      <div class="pick-status" id="pick-status"></div>
+      <div class="note">
+        Compares <strong>preset time (&Sigma; exec_set)</strong> against <strong>actual time (&Sigma; exec_time)</strong> per run and per test step,
+        slot-to-slot and lot-to-lot. Runs need a valid <strong>.bidf</strong> SQLite database (gzipped or plain);
+        preset time exists only in BiDF revision 1.5 logs. EDA logs (rev &lt; 1.5) can borrow an estimated
+        preset from another loaded run &mdash; marked <strong>~</strong> and editable &mdash; for time-delta analysis.
+      </div>
+    </div>
+
+    <!-- ===================== Dashboard ===================== -->
+    <div id="dash" class="dash">
+      <div class="action-bar">
+        <div class="action-info">
+          <strong id="kpi-files">0</strong> run(s) loaded &nbsp;|&nbsp;
+          A: <strong id="kpi-a">0</strong> &nbsp;|&nbsp; B: <strong id="kpi-b">0</strong> &nbsp;|&nbsp;
+          <span id="kpi-total"></span>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-sm" onclick="exportToXLSX()">Export XLSX Analysis</button>
+          <button class="btn-sec btn-sm" onclick="window.print()">Print / PDF</button>
+          <button class="btn-sec btn-sm" onclick="resetApp()">Close All</button>
+        </div>
+      </div>
+
+      <div class="meta-grid" id="summary-cards"></div>
+
+      <div class="tol-bar no-print">
+        <label>Pass tolerance &mdash; per step:
+          <input type="number" id="tol-step" value="2" min="0" step="0.1" /> %
+        </label>
+        <label>per run:
+          <input type="number" id="tol-run" value="1" min="0" step="0.1" /> %
+        </label>
+        <label><input type="checkbox" id="show-extras" /> show extra timing columns (timestamp delta, gap before)</label>
+        <span class="spacer"></span>
+        <button class="btn-sec btn-sm" onclick="recompute()">Re-evaluate</button>
+      </div>
+
+      <!-- Print-only report head (the polyfill inserts the Long-Form print date here) -->
+      <div id="print-head" class="print-only">
+        <div style="font-size:16px;font-weight:700;margin-bottom:4px;">TTI P2 Data Analysis &ndash; Time</div>
+        <div id="print-summary" style="font-size:12px;color:#333;margin-bottom:8px;"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="section">
+          <div class="section-title"><span>Lot to lot</span><span class="badge" id="lot-badge">0</span></div>
+          <div class="section-body"><table id="lot-table"><thead><tr id="lot-head"></tr></thead><tbody id="lot-body"></tbody></table></div>
+          <div class="note">Whole-folder totals grouped by lot number, A against B.</div>
+        </div>
+        <div class="section">
+          <div class="section-title"><span>Slot to slot</span><span class="badge" id="slot-badge">0</span></div>
+          <div class="section-body scroll-y"><table id="slot-table"><thead><tr id="slot-head"></tr></thead><tbody id="slot-body"></tbody></table></div>
+          <div class="note" id="slot-note">Runs are paired by BIB position (slot) when both folders share slot numbers, otherwise by order.</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="chart-card">
+          <div class="section-title"><span>Preset vs actual &mdash; per test step</span>
+            <select class="inline-select no-print" id="step-run" onchange="drawStepChart()"></select>
+          </div>
+          <div class="chart-box"><canvas id="chart-steps"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="section-title"><span>Trend &mdash; &Sigma;actual per slot, A vs B</span></div>
+          <div class="chart-box"><canvas id="chart-slots"></canvas></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="section-title"><span>Trend &mdash; deviation from preset per slot (%)</span></div>
+        <div class="chart-box tall"><canvas id="chart-trend"></canvas></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <span>Run identity, BiDF compliance &amp; data quality</span>
+          <span class="badge" id="quality-badge">0</span>
+        </div>
+        <div class="section-body"><table id="quality-table"><thead><tr id="quality-head"></tr></thead><tbody id="quality-body"></tbody></table></div>
+        <div class="note">Checks the run identity against the naming rule in the BiDF specification
+          (4-character plant code + YYYYMMDDHHMMSS, <code>__</code> oven/chamber, <code>__</code> BIB position,
+          <code>__</code> program, <code>__</code> LotNumber) and flags timestamp precision problems.</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span>Test step detail</span>
+          <select class="inline-select no-print" id="detail-run" onchange="renderDetail()"></select>
+          <span class="badge" id="detail-badge">0 steps</span>
+        </div>
+        <div class="preset-bar no-print" id="preset-bar">
+          <span class="preset-bar-title">Preset (EDA)</span>
+          <label>source <select class="inline-select" id="preset-ref"></select></label>
+          <label>ref offset <input type="number" id="preset-offset" min="0" max="24" step="1" value="0" /></label>
+          <button class="btn-sec btn-sm" onclick="applyEstimate()">Apply estimate</button>
+          <button class="btn-sec btn-sm" onclick="clearEstimates()">Clear estimates</button>
+          <span class="preset-sep"></span>
+          <label><input type="number" id="preset-bulk" min="0" step="0.001" placeholder="min" /></label>
+          <button class="btn-sec btn-sm" onclick="fillEmptyPresets()">Fill empty</button>
+          <button class="btn-sec btn-sm" onclick="setAllPresets()">Set all</button>
+          <button class="btn-sec btn-sm" onclick="resetPresetsToFile()">Reset to file</button>
+          <button class="btn-sec btn-sm" onclick="clearSavedPresets()">Clear saved</button>
+          <span class="preset-report" id="preset-report"></span>
+        </div>
+        <div class="section-body scroll-y"><table id="detail-table"><thead><tr id="detail-head"></tr></thead><tbody id="detail-body"></tbody></table></div>
+        <div class="note" id="detail-note"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="overlay" id="progress-overlay">
+    <div class="progress-box">
+      <h3 class="progress-title" id="progress-title">Reading logs&hellip;</h3>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-status"><span id="progress-msg">Initialising&hellip;</span><span id="progress-pct">0%</span></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+  // =====================================================================
+  // P2 Data Analysis - Time : preset time vs actual time across runs
+  //   A = reference folder, B = candidate folder
+  //   source of truth = *.bidf(.gz) SQLite logs (tbl_run + tbl_testflow)
+  // =====================================================================
+  'use strict';
+
+  var runs = { A: [], B: [] };      // [{ slot, name, path, identity, summary, steps, flags }]
+  var thresholds = { step: 2.0, run: 1.0 };
+  var charts = { steps: null, slots: null, trend: null };
+  var pairMode = 'bib';             // 'bib' | 'order'
+
+  // ---------------------------------------------------------------- utils
+  function $(id) { return document.getElementById(id); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function showToast(msg, type) {
+    var c = $('toast-container');
+    var t = document.createElement('div');
+    t.className = 'toast ' + (type || 'success');
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(function () {
+      t.style.transition = 'opacity .2s';
+      t.style.opacity = '0';
+      setTimeout(function () { t.remove(); }, 220);
+    }, 5000);
+  }
+
+  function showProgress(msg, pct, title) {
+    $('progress-overlay').style.display = 'flex';
+    if (title) $('progress-title').textContent = title;
+    $('progress-msg').textContent = msg;
+    $('progress-fill').style.width = pct + '%';
+    $('progress-pct').textContent = pct + '%';
+  }
+  function hideProgress() { $('progress-overlay').style.display = 'none'; }
+
+  function fmtDur(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return '\u2014';
+    var neg = sec < 0; var a = Math.abs(Math.round(sec));
+    var h = Math.floor(a / 3600), m = Math.floor((a % 3600) / 60), s = a % 60;
+    return (neg ? '-' : '') + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+  function fmtPct(v) {
+    if (v === null || v === undefined || isNaN(v)) return '\u2014';
+    return (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+  }
+  function fmtSignedDur(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return '\u2014';
+    return (sec > 0 ? '+' : sec < 0 ? '-' : '') + fmtDur(Math.abs(sec));
+  }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function toNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = typeof v === 'number' ? v : parseFloat(String(v));
+    return isNaN(n) ? null : n;
+  }
+
+  // Log timestamps are machine-local wall time; parse them as UTC so the
+  // displayed value never shifts with the viewer's time zone or DST.
+  function parseTs(v) {
+    if (v === null || v === undefined) return null;
+    var s = String(v).trim();
+    if (!s) return null;
+    var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) return { ms: Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)), sec: m[6] !== undefined };
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) return { ms: Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)), sec: m[6] !== undefined };
+    var d = new Date(s.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : { ms: d.getTime(), sec: /:\d{2}:\d{2}/.test(s) };
+  }
+  function fmtTs(ms) {
+    if (!ms) return '\u2014';
+    var d = new Date(ms);
+    function p(n) { return String(n).padStart(2, '0'); }
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' +
+           p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }
+  function fmtStampForSheet(ms) { return ms ? fmtTs(ms) : ''; }
+
+  // ------------------------------------------------------- folder / files
+  function bridge() { return (typeof window.tools !== 'undefined' && window.tools) ? window.tools : null; }
+
+  function pickFolder(slot) {
+    var t = bridge();
+    if (!t || typeof t.SelectDirectory !== 'function') {
+      showToast('Folder picker is unavailable in this window.', 'danger');
+      return;
+    }
+    var dir = t.SelectDirectory();
+    if (!dir) return;                     // user cancelled
+    scanFolder(slot, dir);
+  }
+
+  function scanFolder(slot, dir) {
+    var t = bridge();
+    showProgress('Scanning ' + dir + '\u2026', 5, 'Scanning folder ' + slot);
+    var found = [];
+    var MAX_DEPTH = 6;
+
+    function walk(path, depth) {
+      var json;
+      try { json = t.ListDirectory(path); } catch (e) { return; }
+      var items;
+      try { items = JSON.parse(json || '[]'); } catch (e) { return; }
+      items.forEach(function (it) {
+        if (it.isDir) { if (depth < MAX_DEPTH) walk(it.p, depth + 1); return; }
+        if (/\.bidf(\.gz)?$/i.test(it.name || '')) found.push({ path: it.p, name: it.name });
+      });
+    }
+
+    setTimeout(function () {
+      try { walk(dir, 0); } catch (e) { hideProgress(); showToast('Folder scan failed: ' + e.message, 'danger'); return; }
+      if (!found.length) {
+        hideProgress();
+        setPickPath(slot, dir, 0);
+        showToast('No *.bidf or *.bidf.gz files found in that folder.', 'danger');
+        return;
+      }
+      setPickPath(slot, dir, found.length);
+      hideProgress();
+      showToast(found.length + ' log file(s) found in folder ' + slot + '.');
+      queueLoad(slot, found.map(function (f) { return { name: f.name, path: f.path }; }));
+    }, 60);
+  }
+
+  function setPickPath(slot, dir, count) {
+    $('path-' + slot.toLowerCase()).textContent = dir;
+    $('count-' + slot.toLowerCase()).textContent = count ? count + ' file(s)' : '';
+    $('pick-' + slot.toLowerCase()).classList.toggle('loaded', !!count);
+  }
+
+  // ---- drag & drop: the whole window accepts folders ---------------------
+  // WebView2 would otherwise navigate away to a dropped file, so the default is
+  // prevented everywhere and the target folder (A or B) is resolved from where
+  // the drop landed. DataTransferItem entries are only valid inside the event,
+  // so every entry is captured synchronously before the first await.
+  function slotForPoint(x, y) {
+    var rects = { A: $('pick-a').getBoundingClientRect(), B: $('pick-b').getBoundingClientRect() };
+    for (var s in rects) {
+      var r = rects[s];
+      if (r.width && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return s;
+    }
+    return runs.A.length ? 'B' : 'A';              // otherwise the first empty folder
+  }
+
+  function paintDropTarget(slot) {
+    ['A', 'B'].forEach(function (s) {
+      $('pick-' + s.toLowerCase()).classList.toggle('dragover', !!slot && s === slot);
+    });
+  }
+
+  var dragDepth = 0;
+  window.addEventListener('dragenter', function (e) {
+    e.preventDefault();
+    dragDepth++;
+    paintDropTarget(slotForPoint(e.clientX, e.clientY));
+  }, true);
+  window.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    paintDropTarget(slotForPoint(e.clientX, e.clientY));
+  }, true);
+  window.addEventListener('dragleave', function (e) {
+    e.preventDefault();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) paintDropTarget(null);
+  }, true);
+  window.addEventListener('drop', async function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth = 0;
+    paintDropTarget(null);
+
+    var dt = e.dataTransfer || {};
+    var items = dt.items ? Array.prototype.slice.call(dt.items) : [];
+    var entries = [];
+    for (var i = 0; i < items.length; i++) {
+      try {
+        var en = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+        if (en) entries.push(en);
+      } catch (err) { /* ignore unusable items */ }
+    }
+    var flatFiles = [];
+    if (!entries.length && dt.files) flatFiles = Array.prototype.slice.call(dt.files);
+
+    var groups = [];
+    for (var g = 0; g < entries.length; g++) groups.push(await walkEntry(entries[g]));
+    groups = groups.filter(function (grp) { return grp.length; });
+    if (!groups.length && flatFiles.length) {
+      var keep = flatFiles.filter(function (f) { return /\.bidf(\.gz)?$/i.test(f.name); });
+      if (keep.length) groups.push(keep);
+    }
+    if (!groups.length) {
+      showToast('No *.bidf / *.bidf.gz files found in the dropped item.', 'danger');
+      return;
+    }
+
+    // Two folders dropped together fill A then B; a single folder goes to the
+    // card it was dropped on (or the first empty one).
+    var targets = groups.length >= 2 ? ['A', 'B'] : [slotForPoint(e.clientX, e.clientY)];
+    groups.slice(0, targets.length).forEach(function (grp, k) {
+      var slot = targets[k];
+      showToast(grp.length + ' log file(s) dropped into folder ' + slot + '.');
+      queueLoad(slot, grp.map(function (f) { return { name: f.name, file: f }; }));
+    });
+  }, true);
+
+  function walkEntry(entry) {
+    return new Promise(function (resolve) {
+      if (entry.isFile) {
+        if (/\.bidf(\.gz)?$/i.test(entry.name)) entry.file(function (f) { resolve([f]); }, function () { resolve([]); });
+        else resolve([]);
+      } else if (entry.isDirectory) {
+        var reader = entry.createReader();
+        var all = [];
+        (function readBatch() {
+          reader.readEntries(function (ents) {
+            if (!ents.length) {
+              Promise.all(all.map(walkEntry)).then(function (res) {
+                resolve(res.reduce(function (a, b) { return a.concat(b); }, []));
+              });
+            } else { all = all.concat(Array.from(ents)); readBatch(); }
+          }, function () { resolve([]); });
+        })();
+      } else { resolve([]); }
+    });
+  }
+
+  // ---- read + parse ------------------------------------------------------
+  function base64ToU8(b64) {
+    var bin = atob(b64);
+    var u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  }
+
+  async function gunzipMaybe(u8) {
+    if (!(u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b)) return u8;   // plain .bidf
+    if (typeof DecompressionStream !== 'function') throw new Error('gzip support unavailable in this runtime');
+    var ds = new DecompressionStream('gzip');
+    var stream = new Blob([u8]).stream().pipeThrough(ds);
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  var SQL = null;
+  async function ensureSql() {
+    if (SQL) return SQL;
+    if (typeof initSqlJs !== 'function') throw new Error('SQLite engine (sql-wasm.js) not loaded');
+    SQL = await initSqlJs({ locateFile: function (f) { return 'libs/' + f; } });
+    return SQL;
+  }
+
+  async function loadEntries(slot, entries) {
+    showProgress('Loading ' + entries.length + ' log file(s)\u2026', 2, 'Reading folder ' + slot);
+    try { await ensureSql(); }
+    catch (e) { hideProgress(); showToast('SQLite engine failed to start: ' + e.message, 'danger'); return; }
+
+    var t = bridge();
+    var parsed = [];
+    for (var i = 0; i < entries.length; i++) {
+      var ent = entries[i];
+      showProgress('Parsing ' + ent.name, Math.round(((i + 1) / entries.length) * 95), 'Reading folder ' + slot);
+      await sleep(10);
+      try {
+        var bytes;
+        if (ent.file) {
+          bytes = new Uint8Array(await ent.file.arrayBuffer());
+        } else {
+          var b64 = t && t.ReadFileBase64 ? t.ReadFileBase64(ent.path) : '';
+          if (!b64) throw new Error('file could not be read');
+          bytes = base64ToU8(b64);
+        }
+        var db = await gunzipMaybe(bytes);
+        var run = parseBidf(db, ent.name, ent.path);
+        if (run) parsed.push(run);
+        else showToast('Skipped ' + ent.name + ': no tbl_run / tbl_testflow data.', 'warning');
+      } catch (e) {
+        showToast('Failed to parse ' + ent.name + ': ' + e.message, 'danger');
+      }
+    }
+
+    // The comparison only starts once BOTH folders are loaded; loading A alone
+    // must not switch to the dashboard (the pick row stays visible meanwhile).
+    hideProgress();
+    runs[slot] = parsed;
+    showToast('Folder ' + slot + ': ' + parsed.length + ' run(s) parsed, ' +
+      parsed.reduce(function (a, r) { return a + r.steps.length; }, 0) + ' test steps.');
+    updatePickStatus();
+    if (runs.A.length && runs.B.length) buildDashboard();
+  }
+
+  // Serialise loads so a two-folder drop cannot interleave progress updates.
+  var loadChain = Promise.resolve();
+  function queueLoad(slot, entries) {
+    loadChain = loadChain.then(function () { return loadEntries(slot, entries); });
+  }
+
+  function updatePickStatus() {
+    var el = $('pick-status');
+    var a = runs.A.length, b = runs.B.length;
+    if (a && b) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.className = 'pick-status';
+    if (!a && !b) {
+      el.textContent = 'Select a folder for A and for B (or drop them on the cards) \u2014 the comparison starts once both are loaded.';
+    } else if (a) {
+      el.textContent = 'Folder A: ' + a + ' run(s) loaded \u2014 now select or drop folder B; the comparison starts once B is loaded too.';
+    } else {
+      el.textContent = 'Folder B: ' + b + ' run(s) loaded \u2014 now select or drop folder A; the comparison starts once A is loaded too.';
+    }
+  }
+
+  // ------------------------------------------------------------ BiDF read
+  function tableColumnMap(db, table) {
+    var res;
+    try { res = db.exec('PRAGMA table_info([' + table + '])'); } catch (e) { return null; }
+    if (!res.length) return null;
+    var map = {};
+    res[0].values.forEach(function (v) {
+      var key = String(v[1]).toLowerCase().replace(/\s+/g, ' ').trim();
+      map[key] = String(v[1]);
+    });
+    return map;
+  }
+
+  function selectRows(db, table, wanted) {
+    var map = tableColumnMap(db, table);
+    if (!map) return { map: null, cols: [], rows: [] };
+    var cols = [];
+    wanted.forEach(function (w) { if (map[w] !== undefined) cols.push({ key: w, col: map[w] }); });
+    if (!cols.length) return { map: map, cols: [], rows: [] };
+    var sql = 'SELECT ' + cols.map(function (c) { return '"' + c.col + '"'; }).join(', ') + ' FROM [' + table + ']';
+    if (wanted.indexOf('test_index') >= 0) sql += ' ORDER BY test_index';
+    else sql += ' LIMIT 1';
+    var res;
+    try { res = db.exec(sql); } catch (e) { return { map: map, cols: cols, rows: [] }; }
+    if (!res.length) return { map: map, cols: cols, rows: [] };
+    return { map: map, cols: cols, rows: res[0].values };
+  }
+
+  var RUN_COLS = ['id_run', 'id_run_ch', 'plant', 'ovenname', 'platform', 'bibpos', 'programname',
+    'lotnumber', 'dutname', 'package', 'timestamp_start', 'timestamp_end', 'count_parts', 'good_parts',
+    'bidfrev', 'certification', 'endcause', 'currentsegment'];
+
+  var FLOW_COLS = ['test_index', 'segment', 'cycle', 'test_id', 'temperature', 'temp_set',
+    'timestamp_start', 'timestamp_end', 'exec_time', 'exec_set', 'exec_set (new)', 'note', 'test_occurrence'];
+
+  function parseBidf(dbBytes, fileName, filePath) {
+    var db = new SQL.Database(dbBytes);
+    try {
+      var runRes = selectRows(db, 'tbl_run', RUN_COLS);
+      var flowRes = selectRows(db, 'tbl_testflow', FLOW_COLS);
+      if (!flowRes.rows.length) return null;
+
+      function field(res, key) {
+        var idx = -1;
+        for (var i = 0; i < res.cols.length; i++) if (res.cols[i].key === key) { idx = i; break; }
+        return idx < 0 ? null : res.rows[0][idx];
+      }
+      var runRow = {
+        id_run: field(runRes, 'id_run'), plant: field(runRes, 'plant'), ovenname: field(runRes, 'ovenname'),
+        platform: field(runRes, 'platform'), bibpos: field(runRes, 'bibpos'),
+        programname: field(runRes, 'programname'), lotnumber: field(runRes, 'lotnumber'),
+        dutname: field(runRes, 'dutname'), package: field(runRes, 'package'),
+        tsStart: field(runRes, 'timestamp_start'), tsEnd: field(runRes, 'timestamp_end'),
+        countParts: field(runRes, 'count_parts'), goodParts: field(runRes, 'good_parts'),
+        rev: field(runRes, 'bidfrev'), endcause: field(runRes, 'endcause')
+      };
+
+      var hasSet = flowRes.cols.some(function (c) { return c.key === 'exec_set' || c.key === 'exec_set (new)'; });
+      var colIndex = {};
+      flowRes.cols.forEach(function (c, i) { colIndex[c.key] = i; });
+
+      var steps = [];
+      var prevEnd = null;
+      var lastIndex = flowRes.rows.length;
+      flowRes.rows.forEach(function (row, i) {
+        function g(k) { return colIndex[k] === undefined ? null : row[colIndex[k]]; }
+        var tsA = parseTs(g('timestamp_start'));
+        var tsB = parseTs(g('timestamp_end'));
+        var setMs = hasSet ? toNum(g('exec_set') !== null ? g('exec_set') : g('exec_set (new)')) : null;
+        var actMs = toNum(g('exec_time'));
+        var setSec = setMs === null ? null : setMs / 1000;
+        var actSec = actMs === null ? null : actMs / 1000;
+        var tsDelta = (tsA && tsB) ? (tsB.ms - tsA.ms) / 1000 : null;
+        var gap = (tsA && prevEnd) ? (tsA.ms - prevEnd) / 1000 : null;
+        var delta = (setSec !== null && actSec !== null) ? (actSec - setSec) : null;
+        var deltaPct = (delta !== null && setSec > 0) ? (delta / setSec) * 100 : null;
+        steps.push({
+          i: i, test_index: g('test_index'), segment: g('segment'), cycle: g('cycle'),
+          test_id: g('test_id'), name: g('note'),
+          temperature: toNum(g('temperature')), temp_set: toNum(g('temp_set')),
+          start: tsA ? tsA.ms : null, end: tsB ? tsB.ms : null,
+          startHasSec: tsA ? tsA.sec : false, endHasSec: tsB ? tsB.sec : false,
+          set: setSec, actual: actSec, tsDelta: tsDelta, gap: gap,
+          delta: delta, deltaPct: deltaPct,
+          // preset provenance: setFile = what the log really says, set = what
+          // this analysis uses (may later be estimated or typed by the operator)
+          setFile: setSec,
+          setSource: setSec === null ? null : 'file',
+          setMatch: null, setFrom: null, setFromRef: null,
+          last: (i === lastIndex - 1)
+        });
+        if (tsB) prevEnd = tsB.ms;
+      });
+
+      var sum = function (k) {
+        return steps.reduce(function (a, s) { return a + (typeof s[k] === 'number' && !isNaN(s[k]) ? s[k] : 0); }, 0);
+      };
+      var setTotal = hasSet ? sum('set') : null;
+      var actTotal = sum('actual');
+      var tsTotal = sum('tsDelta');
+      var gapTotal = sum('gap');
+      var runDelta = (setTotal !== null) ? (actTotal - setTotal) : null;
+      var runDeltaPct = (setTotal !== null && setTotal > 0) ? (runDelta / setTotal) * 100 : null;
+
+      var firstStart = steps.find(function (s) { return s.start; });
+      var lastEnd = null;
+      for (var k = steps.length - 1; k >= 0; k--) { if (steps[k].end) { lastEnd = steps[k].end; break; } }
+      var stepSpan = (firstStart && lastEnd) ? (lastEnd - firstStart.start) / 1000 : null;
+      // Wall clock: the run's own door-to-door span from tbl_run when present,
+      // otherwise the span covered by the test steps.
+      var runStartTs = parseTs(runRow.tsStart), runEndTs = parseTs(runRow.tsEnd);
+      var wall = (runStartTs && runEndTs) ? (runEndTs.ms - runStartTs.ms) / 1000 : stepSpan;
+      var wallSource = (runStartTs && runEndTs) ? 'tbl_run' : 'test steps';
+
+      var minuteOnly = steps.some(function (s) { return (s.start && !s.startHasSec) || (s.end && !s.endHasSec); });
+
+      var nameParts = parseRunName(fileName);
+      var identity = {
+        fileName: fileName, filePath: filePath || '', nameParts: nameParts,
+        customer: nameParts.oven ? String(nameParts.oven).split('_')[0] : '',
+        lot: runRow.lotnumber || '', oven: runRow.ovenname || '', bibpos: runRow.bibpos,
+        program: runRow.programname || '', plant: runRow.plant || '', platform: runRow.platform || '',
+        dut: runRow.dutname || '', pkg: runRow.package || '', rev: runRow.rev || '',
+        idRun: runRow.id_run || '', endcause: runRow.endcause || '',
+        parts: toNum(runRow.countParts), good: toNum(runRow.goodParts),
+        runStart: parseTs(runRow.tsStart), runEnd: parseTs(runRow.tsEnd)
+      };
+
+      var flags = complianceFlags(identity, hasSet, minuteOnly);
+
+      // EDA runs are the only ones that may get an estimated / edited preset.
+      var isEda = isEdaIdentity(identity);
+      var hasFilePreset = steps.some(function (s) { return typeof s.set === 'number'; });
+
+      var run = {
+        slot: String(runRow.bibpos === null || runRow.bibpos === undefined ? '' : runRow.bibpos),
+        lot: identity.lot, name: fileName, path: filePath || '',
+        identity: identity, hasSet: hasSet, minuteOnly: minuteOnly,
+        isEda: isEda,
+        recipeKey: normRecipe(identity.program) || normRecipe(identity.nameParts.program),
+        hasFilePreset: hasFilePreset,
+        hasPreset: hasFilePreset,
+        estApplied: false, estRefIdx: null, estOffset: null, estAuto: false, estRefLabel: null,
+        savedApplied: false,
+        steps: steps,
+        summary: {
+          setTotal: setTotal, actTotal: actTotal, tsTotal: tsTotal, gapTotal: gapTotal,
+          runDelta: runDelta, runDeltaPct: runDeltaPct, wall: wall, wallSource: wallSource,
+          stepSpan: stepSpan,
+          stepCount: steps.length,
+          failSteps: 0, passSteps: 0
+        },
+        flags: flags
+      };
+      // Re-derive the totals from the effective preset for EDA runs, so an
+      // estimated or typed value flows straight into every table and chart.
+      if (isEda) applyPreset(run);
+      return run;
+    } finally {
+      db.close();
+    }
+  }
+
+  // ---- run-name rule: plant(4) + YYYYMMDDHHMMSS __ oven_chamber __ bibpos __ program __ lot
+  function parseRunName(fileName) {
+    var base = String(fileName || '').replace(/\.bidf(\.gz)?$/i, '');
+    var parts = base.split('__');
+    var head = parts.shift() || '';
+    var m = head.match(/^([A-Za-z0-9]{4})(\d{12}|\d{14})$/);
+    var out = { raw: base, parts: parts, plant: m ? m[1] : '', stamp: m ? m[2] : '', stampHasSeconds: m ? m[2].length === 14 : false };
+    out.oven = parts[0] || '';
+    out.bibpos = parts[1] || '';
+    out.program = parts[2] || '';
+    out.lot = parts.slice(3).join('__') || '';
+    return out;
+  }
+
+  function complianceFlags(identity, hasSet, minuteOnly) {
+    var p = identity.nameParts, flags = [];
+    if (!p.plant || !p.stamp) flags.push({ lvl: 'bad', text: 'file name does not follow plant + YYYYMMDDHHMMSS' });
+    else if (!p.stampHasSeconds) flags.push({ lvl: 'bad', text: 'file name is missing the 2 seconds digits' });
+    if (p.plant && identity.plant && p.plant.toLowerCase() !== String(identity.plant).toLowerCase())
+      flags.push({ lvl: 'warn', text: 'plant code differs from tbl_run.plant' });
+    if (!p.lot) flags.push({ lvl: 'warn', text: 'no LotNumber segment in the file name' });
+    var idHead = String(identity.idRun || '').split('__')[0];
+    if (idHead && p.plant && p.stamp && idHead !== (p.plant + p.stamp))
+      flags.push({ lvl: 'warn', text: 'id_run start time differs from the file name' });
+    if (!/-?\d{2}$/.test(String(p.bibpos || '')))
+      flags.push({ lvl: 'warn', text: 'BIB position is not a 2-digit value' });
+    if (!hasSet) {
+      flags.push({ lvl: 'warn', text: isEdaIdentity(identity)
+        ? 'no exec_set column (BiDF rev < 1.5) \u2013 preset estimated / entered manually'
+        : 'no exec_set column (BiDF rev < 1.5) \u2013 preset time unavailable' });
+    }
+    if (String(identity.rev || '').trim() && String(identity.rev).trim() !== '1.5')
+      flags.push({ lvl: 'warn', text: 'BiDFRev ' + String(identity.rev).trim() + ' (specification is 1.5)' });
+    if (minuteOnly) flags.push({ lvl: 'warn', text: 'timestamps have no seconds \u2013 timestamp delta is minute-resolution' });
+    return flags;
+  }
+
+  // =====================================================================
+  // EDA preset support (EDA ONLY)
+  //   EDA logs (BiDF rev < 1.5) carry no exec_set column, so there is nothing
+  //   to compare the actual step time against. For EDA runs only, a preset is
+  //   estimated from another loaded run that does have exec_set (normally the
+  //   same recipe on a BiDF 1.5 machine) and can then be edited by hand for
+  //   time-delta analysis.
+  //
+  //   COBIS runs are never estimated, never editable and never persisted - for
+  //   them every code path below is skipped, so their numbers, tables, exports
+  //   and toolbars are exactly what they were before.
+  // =====================================================================
+  var PRESET_STORE_KEY = 'tti.p2time.presets.v1';
+
+  function allRuns() { return runs.A.concat(runs.B); }
+
+  // EDA detection uses structural fields only - never the free-text lot name.
+  //   program  p_tm_brf9_b_05_4_32.plnx   the EDA loader keeps the .plnx suffix
+  //   chamber  EDA-8409-CHM2              EDA chamber naming
+  function isEdaIdentity(identity) {
+    var prog = String((identity && identity.program) || '');
+    var oven = String((identity && identity.oven) || '');
+    return /\.plnx$/i.test(prog) || /(^|[^A-Za-z0-9])EDA([^A-Za-z0-9]|$)/i.test(oven);
+  }
+
+  // "p_tm_brf9_b_05_4_32.plnx" and "P_TM_BRF9_B_05_4_32" are the same recipe.
+  function normRecipe(program) {
+    return String(program || '').replace(/\.(plnx|plc|prg|txt|job)$/i, '')
+      .toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function runTag(r) {
+    var slot = runs.A.indexOf(r) >= 0 ? 'A' : 'B';
+    var i = runs[slot].indexOf(r);
+    return slot + (i < 0 ? '?' : (i + 1));
+  }
+
+  function stepLabel(s) {
+    var ix = (s.test_index === null || s.test_index === undefined || s.test_index === '')
+      ? (s.i + 1) : s.test_index;
+    var nm = String(s.name || '').trim();
+    return String(ix) + (nm ? ' (' + nm + ')' : '');
+  }
+
+  // A run only shows "no preset time" when it really has no baseline to use.
+  function hasNoPreset(r) {
+    return r.isEda ? !r.hasPreset : !r.hasSet;
+  }
+
+  // Effective preset -> per-step delta and run totals. EDA runs only.
+  function applyPreset(run) {
+    var total = 0, any = false;
+    run.steps.forEach(function (s) {
+      var setSec = (typeof s.set === 'number' && !isNaN(s.set)) ? s.set : null;
+      if (setSec !== null) { any = true; total += setSec; }
+      s.delta = (setSec !== null && s.actual !== null && s.actual !== undefined) ? (s.actual - setSec) : null;
+      s.deltaPct = (s.delta !== null && setSec > 0) ? (s.delta / setSec) * 100 : null;
+    });
+    run.summary.setTotal = any ? total : null;
+    run.summary.runDelta = (run.summary.setTotal !== null) ? (run.summary.actTotal - run.summary.setTotal) : null;
+    run.summary.runDeltaPct = (run.summary.setTotal !== null && run.summary.setTotal > 0)
+      ? (run.summary.runDelta / run.summary.setTotal) * 100 : null;
+    run.hasPreset = any;
+  }
+
+  function presetStats(run) {
+    var st = { file: 0, estimate: 0, manual: 0, none: 0 };
+    run.steps.forEach(function (s) {
+      if (s.set === null || s.set === undefined) st.none++;
+      else if (s.setSource === 'manual') st.manual++;
+      else if (s.setSource === 'estimate') st.estimate++;
+      else st.file++;
+    });
+    return st;
+  }
+
+  function presetSourceLabel(s) {
+    if (s.set === null || s.set === undefined) return '';
+    if (s.setSource === 'estimate') return 'estimated ' + (s.setFromRef || '');
+    if (s.setSource === 'manual') return 'manual';
+    return 'file';
+  }
+
+  // ---- reference run lookup ------------------------------------------------
+  // Only steps that really carry a preset qualify as a source (set != null),
+  // so an EDA run that was itself estimated can never become a source.
+  function refLookups(ref) {
+    var byName = {}, bySegId = {}, byId = {};
+    ref.steps.forEach(function (s) {
+      var sec = (typeof s.set === 'number' && !isNaN(s.set)) ? s.set : null;
+      if (sec === null) return;
+      var rec = { sec: sec, idx: s.i, label: stepLabel(s) };
+      var nm = String(s.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (nm) (byName[nm] = byName[nm] || []).push(rec);
+      var sid = String(s.segment) + '|' + String(s.test_id);
+      (bySegId[sid] = bySegId[sid] || []).push(rec);
+      if (s.test_id !== null && s.test_id !== undefined) {
+        var id = String(s.test_id);
+        (byId[id] = byId[id] || []).push(rec);
+      }
+    });
+    return { byName: byName, bySegId: bySegId, byId: byId };
+  }
+
+  function onlyOne(list) {
+    return (list && list.length === 1) ? list[0] : null;
+  }
+
+  // ---- automatic reference alignment --------------------------------------
+  // EDA and COBIS lists are not step-for-step identical (COBIS drops in extra
+  // transition rows such as "TEST CLOSED"), so starting at offset 0 shifts the
+  // whole preset column by a row: every EDA step then shows the preset of the
+  // step before it. Instead of guessing, score every candidate offset against
+  // the actual step times and keep the one that fits best:
+  //   median relative error  ->  count within 25 %  ->  mean relative error.
+  // Pairs whose reference preset is 0 or missing are skipped (exec_set = 0 is
+  // a valid zero and gives no ratio), and a candidate needs at least half the
+  // steps mapped so a short tail cannot win by luck.
+  function offsetScore(run, ref, k) {
+    var errs = [];
+    run.steps.forEach(function (s) {
+      var rs = ref.steps[s.i + k];
+      if (!rs || s.actual === null || s.actual === undefined) return;
+      var pre = (typeof rs.set === 'number' && !isNaN(rs.set)) ? rs.set : null;
+      if (pre === null || pre <= 0) return;
+      errs.push(Math.abs(s.actual - pre) / pre);
+    });
+    if (errs.length < Math.max(3, Math.ceil(run.steps.length * 0.5))) return null;
+    errs.sort(function (a, b) { return a - b; });
+    var within = 0;
+    errs.forEach(function (e) { if (e <= 0.25) within++; });
+    var mean = errs.reduce(function (a, b) { return a + b; }, 0) / errs.length;
+    return { k: k, med: errs[Math.floor(errs.length / 2)], within: within, mean: mean, n: errs.length };
+  }
+
+  function bestOffset(run, ref) {
+    var best = null;
+    var maxK = Math.min(24, Math.max(0, ref.steps.length - 1));
+    for (var k = 0; k <= maxK; k++) {
+      var sc = offsetScore(run, ref, k);
+      if (!sc) continue;
+      if (!best ||
+          sc.med < best.med - 1e-9 ||
+          (Math.abs(sc.med - best.med) <= 1e-9 && sc.within > best.within) ||
+          (Math.abs(sc.med - best.med) <= 1e-9 && sc.within === best.within && sc.mean < best.mean)) {
+        best = sc;
+      }
+    }
+    return best ? best.k : 0;
+  }
+
+  // Hybrid matching, in order of confidence:
+  //   name -> segment:test_id -> sequence index + offset -> unique test_id.
+  // test_id alone sits LAST on purpose: EDA (.plnx) and COBIS number their
+  // steps differently, so a bare id collision is not identity - e.g. EDA
+  // id=4 (VDS=690_VGS=0, 372 s) would otherwise land on COBIS id=4
+  // "TEST CLOSED" (120 s). The index pass (offset adjustable) speaks for the
+  // whole series; the id pass only fills steps the index cannot reach.
+  // Every filled step remembers how it was matched, so the report and the
+  // cell tooltip can state it instead of pretending the number is measured.
+  function estimateRun(run, ref) {
+    // A null offset means "align automatically"; a number means the operator
+    // chose it in the spinner.
+    var auto = (run.estOffset === null || run.estOffset === undefined);
+    var offset = auto ? bestOffset(run, ref) : Math.max(0, Math.round(run.estOffset));
+    run.estOffset = offset;
+    run.estAuto = auto;
+    var tag = runTag(ref);
+
+    // Re-estimating must not stack: drop the previous estimates (manual and
+    // file values are never touched).
+    run.steps.forEach(function (s) {
+      if (s.setSource === 'estimate') {
+        s.set = null; s.setSource = null; s.setMatch = null; s.setFrom = null; s.setFromRef = null;
+      }
+    });
+
+    var L = refLookups(ref);
+    var passes = [
+      { m: 'name', get: function (s) {
+          return onlyOne(L.byName[String(s.name || '').trim().toLowerCase().replace(/\s+/g, ' ')]);
+        } },
+      { m: 'seg+id', get: function (s) {
+          return onlyOne(L.bySegId[String(s.segment) + '|' + String(s.test_id)]);
+        } },
+      { m: 'index', get: function (s) {
+          var rs = ref.steps[s.i + offset];
+          if (!rs) return null;
+          var sec = (typeof rs.set === 'number' && !isNaN(rs.set)) ? rs.set : null;
+          return sec === null ? null : { sec: sec, idx: rs.i, label: stepLabel(rs) };
+        } },
+      { m: 'id', get: function (s) {
+          return (s.test_id === null || s.test_id === undefined) ? null : onlyOne(L.byId[String(s.test_id)]);
+        } }
+    ];
+
+    passes.forEach(function (pass) {
+      run.steps.forEach(function (s) {
+        if (s.set !== null && s.set !== undefined) return;
+        var hit = pass.get(s);
+        if (!hit) return;
+        s.set = hit.sec;
+        s.setSource = 'estimate';
+        s.setMatch = pass.m;
+        s.setFrom = tag + ' step ' + hit.label;
+        s.setFromRef = tag;
+      });
+    });
+
+    run.estRefLabel = tag;
+    run.hasPreset = run.steps.some(function (s) { return typeof s.set === 'number'; });
+  }
+
+  // Same recipe in the other folder first, then any run that has exec_set.
+  function autoRefFor(run) {
+    var cands = [];
+    allRuns().forEach(function (r) {
+      if (r === run || !r.hasFilePreset) return;
+      cands.push({ r: r, same: r.recipeKey === run.recipeKey, other: r.slot !== run.slot });
+    });
+    if (!cands.length) return null;
+    cands.sort(function (a, b) {
+      return ((a.same ? 0 : 2) + (a.other ? 0 : 1)) - ((b.same ? 0 : 2) + (b.other ? 0 : 1));
+    });
+    return cands[0].r;
+  }
+
+  // ---- per-recipe persistence (local WebView2 profile) --------------------
+  function loadPresetStore() {
+    try {
+      var raw = localStorage.getItem(PRESET_STORE_KEY);
+      var o = raw ? JSON.parse(raw) : null;
+      if (o && o.recipes) return o;
+    } catch (e) { /* private mode / quota - fall through */ }
+    return { version: 1, recipes: {} };
+  }
+
+  function savePresetStore(store) {
+    try { localStorage.setItem(PRESET_STORE_KEY, JSON.stringify(store)); }
+    catch (e) { /* never break the tool */ }
+  }
+
+  function saveRunPresets(run) {
+    if (!run.isEda) return;
+    var key = run.recipeKey;
+    if (!key) return;
+    var store = loadPresetStore();
+    var manual = run.steps.filter(function (s) { return s.setSource === 'manual'; });
+    if (!manual.length) {
+      if (store.recipes[key]) { delete store.recipes[key]; savePresetStore(store); }
+      return;
+    }
+    store.recipes[key] = {
+      updated: new Date().toISOString(),
+      steps: manual.map(function (s) {
+        return { i: s.i, test_id: s.test_id, segment: s.segment, min: +((s.set / 60).toFixed(4)) };
+      })
+    };
+    savePresetStore(store);
+  }
+
+  // Saved manual values win over an estimate, and are matched by segment+test_id
+  // first so a slightly different step count still restores sensibly.
+  function applySavedPresets(run) {
+    if (run.savedApplied) return;
+    run.savedApplied = true;
+    if (!run.isEda || !run.recipeKey) return;
+    var store = loadPresetStore();
+    var rec = store.recipes[run.recipeKey];
+    if (!rec || !rec.steps || !rec.steps.length) return;
+    var byKey = {}, byIndex = {};
+    run.steps.forEach(function (s) {
+      byIndex[s.i] = s;
+      byKey[String(s.segment) + '|' + String(s.test_id)] = s;
+    });
+    rec.steps.forEach(function (e) {
+      if (typeof e.min !== 'number' || isNaN(e.min)) return;
+      var s = (e.test_id === null || e.test_id === undefined)
+        ? null : byKey[String(e.segment) + '|' + String(e.test_id)];
+      if (!s) s = byIndex[e.i];
+      if (!s) return;
+      s.set = e.min * 60;
+      s.setSource = 'manual';
+      s.setMatch = 'saved';
+      s.setFrom = 'saved for this recipe';
+      s.setFromRef = null;
+    });
+  }
+
+  // Runs once per dashboard build: restore saved edits, then auto-estimate an
+  // EDA run that has no preset of its own. COBIS runs are skipped entirely.
+  function preparePresets() {
+    allRuns().forEach(function (r) {
+      if (!r.isEda) return;
+      applySavedPresets(r);
+      if (!r.hasFilePreset && !r.estApplied) {
+        var ref = autoRefFor(r);
+        if (ref) {
+          r.estRefIdx = allRuns().indexOf(ref);
+          r.estOffset = null;          // auto-align the reference to this run
+          estimateRun(r, ref);
+        }
+        r.estApplied = true;
+      }
+      applyPreset(r);
+    });
+  }
+
+  // ---- preset toolbar ------------------------------------------------------
+  function presetReportHtml(r) {
+    var st = presetStats(r);
+    var parts = ['<strong>' + st.file + '</strong> from file'];
+    if (st.estimate) {
+      parts.push('<span class="est"><strong>' + st.estimate + '</strong> estimated' +
+        (r.estRefLabel ? ' from ' + esc(r.estRefLabel) : '') +
+        (r.estOffset ? ' (' + (r.estAuto ? 'auto ' : '') + 'offset +' + r.estOffset + ')' : '') + '</span>');
+    }
+    if (st.manual) parts.push('<span style="color:#005a9e"><strong>' + st.manual + '</strong> manual</span>');
+    if (st.none) parts.push('<strong>' + st.none + '</strong> empty');
+    var methods = {};
+    r.steps.forEach(function (s) {
+      if (s.setMatch && s.setMatch !== 'saved') methods[s.setMatch] = (methods[s.setMatch] || 0) + 1;
+    });
+    var methodText = Object.keys(methods).map(function (k) { return k + ' \u00d7 ' + methods[k]; }).join(', ');
+    return 'preset: ' + parts.join(' \u00b7 ') + (methodText ? ' &middot; matched by ' + esc(methodText) : '');
+  }
+
+  function renderPresetBar(r) {
+    var bar = $('preset-bar');
+    if (!bar) return;
+    if (!r || !r.isEda) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+
+    var sel = $('preset-ref');
+    var opts = [];
+    allRuns().forEach(function (x, i) {
+      if (x === r || !x.hasFilePreset) return;
+      opts.push({ i: i, r: x, same: x.recipeKey === r.recipeKey, other: x.slot !== r.slot });
+    });
+    opts.sort(function (a, b) {
+      return ((a.same ? 0 : 2) + (a.other ? 0 : 1)) - ((b.same ? 0 : 2) + (b.other ? 0 : 1));
+    });
+
+    sel.innerHTML = '';
+    if (!opts.length) {
+      var none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'no run with exec_set loaded';
+      sel.appendChild(none);
+      sel.disabled = true;
+    } else {
+      sel.disabled = false;
+      opts.forEach(function (o) {
+        var opt = document.createElement('option');
+        opt.value = String(o.i);
+        opt.textContent = runTag(o.r) + ' \u00b7 ' + o.r.name;
+        sel.appendChild(opt);
+      });
+      var want = (r.estRefIdx === null || r.estRefIdx === undefined) ? '' : String(r.estRefIdx);
+      sel.value = want;
+      if (!sel.value) sel.value = String(opts[0].i);
+    }
+    $('preset-offset').value = String(r.estOffset || 0);
+    $('preset-report').innerHTML = presetReportHtml(r);
+  }
+
+  // Editable preset cell - EDA runs only; COBIS keeps the plain text cell.
+  function presetCellHtml(r, s) {
+    if (!r.isEda) return '<td class="num">' + fmtDur(s.set) + '</td>';
+    var src = s.setSource || 'none';
+    var min = (s.set === null || s.set === undefined) ? '' : String(+((s.set / 60).toFixed(3)));
+    var title = src === 'estimate'
+      ? ('Estimated from ' + (s.setFrom || '?') + ' \u2013 not measured')
+      : src === 'manual' ? 'Entered manually'
+      : src === 'file' ? 'From exec_set in the log'
+      : 'No preset \u2013 type minutes to add one';
+    return '<td class="num preset-cell preset-' + src + '" title="' + esc(title) + '">' +
+      (src === 'estimate' ? '<span class="preset-tilde">~</span>' : '') +
+      '<input class="preset-input" type="number" min="0" step="0.001" value="' + min +
+      '" data-i="' + s.i + '" aria-label="Preset minutes" />' +
+      '</td>';
+  }
+
+  // ---- editing -------------------------------------------------------------
+  function setPresetValue(s, min) {
+    s.set = (min === null) ? null : min * 60;
+    if (min === null) s.setSource = null;
+    else if (s.setFile !== null && Math.abs(s.set - s.setFile) < 0.5) s.setSource = 'file';
+    else s.setSource = 'manual';
+    s.setMatch = null;
+    s.setFrom = null;
+    s.setFromRef = null;
+  }
+
+  function refreshAfterEdit(focusIndex) {
+    var pageY = window.scrollY;
+    var scroller = document.getElementById('detail-table');
+    scroller = scroller ? scroller.parentNode : null;
+    var scrollTop = scroller ? scroller.scrollTop : 0;
+
+    buildDashboard();
+
+    scroller = document.getElementById('detail-table');
+    scroller = scroller ? scroller.parentNode : null;
+    if (scroller) scroller.scrollTop = scrollTop;
+    window.scrollTo(0, pageY);
+
+    var el = document.querySelector('.preset-input[data-i="' + focusIndex + '"]');
+    if (el) {
+      el.focus();
+      if (el.select) { try { el.select(); } catch (e) { /* number inputs may refuse */ } }
+    }
+  }
+
+  function commitPreset(run, step, raw, focusIndex) {
+    var min = toNum(raw);
+    if (min !== null && min < 0) min = 0;
+    setPresetValue(step, min);
+    applyPreset(run);
+    saveRunPresets(run);
+    refreshAfterEdit(focusIndex === undefined ? step.i : focusIndex);
+  }
+
+  function onDetailPresetChange(e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('preset-input')) return;
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) return;
+    var i = parseInt(el.getAttribute('data-i'), 10);
+    var step = r.steps[i];
+    if (!step) return;
+    commitPreset(r, step, el.value, i);
+  }
+
+  function onDetailPresetKey(e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('preset-input')) return;
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) return;
+    var i = parseInt(el.getAttribute('data-i'), 10);
+    var step = r.steps[i];
+    if (!step) return;
+    commitPreset(r, step, el.value, Math.min(i + 1, r.steps.length - 1));
+  }
+
+  // ---- toolbar actions -----------------------------------------------------
+  function applyEstimate() {
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) {
+      showToast('Preset estimation is available for EDA runs only.', 'danger');
+      return;
+    }
+    var idx = parseInt($('preset-ref').value, 10);
+    var ref = allRuns()[idx];
+    if (!ref || ref === r) {
+      showToast('Select a reference run that carries preset values.', 'danger');
+      return;
+    }
+    var off = toNum($('preset-offset').value);
+    r.estRefIdx = idx;
+    r.estOffset = (off === null || off < 0) ? 0 : Math.min(24, Math.round(off));
+    estimateRun(r, ref);
+    r.estApplied = true;
+    applyPreset(r);
+    buildDashboard();
+    var st = presetStats(r);
+    showToast('Preset estimated for ' + st.estimate + ' step(s) from ' + runTag(ref) +
+      (r.estOffset ? ' (offset +' + r.estOffset + ')' : '') + '.');
+  }
+
+  function clearEstimates() {
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) return;
+    var n = 0;
+    r.steps.forEach(function (s) {
+      if (s.setSource === 'estimate') {
+        s.set = null; s.setSource = null; s.setMatch = null; s.setFrom = null; s.setFromRef = null; n++;
+      }
+    });
+    r.estApplied = true;          // do not silently re-add them on the next build
+    r.estRefLabel = null;
+    applyPreset(r);
+    saveRunPresets(r);
+    buildDashboard();
+    showToast(n ? n + ' estimated preset(s) cleared.' : 'No estimated presets to clear.');
+  }
+
+  function bulkMinutes() {
+    var v = toNum($('preset-bulk').value);
+    if (v === null || v < 0 || isNaN(v)) {
+      showToast('Type a preset value in minutes first (e.g. 6 or 5.5).', 'danger');
+      return null;
+    }
+    return v;
+  }
+
+  function fillEmptyPresets() {
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) return;
+    var min = bulkMinutes();
+    if (min === null) return;
+    var n = 0;
+    r.steps.forEach(function (s) {
+      if (s.set === null || s.set === undefined) { setPresetValue(s, min); n++; }
+    });
+    applyPreset(r);
+    saveRunPresets(r);
+    buildDashboard();
+    showToast(n ? n + ' empty preset cell(s) set to ' + min + ' min.' : 'No empty preset cells.');
+  }
+
+  function setAllPresets() {
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) return;
+    var min = bulkMinutes();
+    if (min === null) return;
+    r.steps.forEach(function (s) { setPresetValue(s, min); });
+    applyPreset(r);
+    saveRunPresets(r);
+    buildDashboard();
+    showToast('All ' + r.steps.length + ' preset cell(s) set to ' + min + ' min.');
+  }
+
+  function resetPresetsToFile() {
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda) return;
+    r.steps.forEach(function (s) {
+      s.set = s.setFile;
+      s.setSource = s.setFile === null ? null : 'file';
+      s.setMatch = null; s.setFrom = null; s.setFromRef = null;
+    });
+    r.estApplied = true;
+    r.estRefLabel = null;
+    applyPreset(r);
+    saveRunPresets(r);           // drops the stored manual values for this recipe
+    buildDashboard();
+    showToast('Preset column reset to the file values.');
+  }
+
+  function clearSavedPresets() {
+    var r = selectedRun('detail-run');
+    if (!r || !r.isEda || !r.recipeKey) return;
+    var store = loadPresetStore();
+    if (!store.recipes[r.recipeKey]) { showToast('No saved presets for this recipe.'); return; }
+    delete store.recipes[r.recipeKey];
+    savePresetStore(store);
+    showToast('Saved presets for this recipe cleared. Manual values stay in this session.');
+  }
+
+  // ------------------------------------------------------------ dashboard
+  function recompute() {
+    thresholds.step = parseFloat($('tol-step').value) || 0;
+    thresholds.run = parseFloat($('tol-run').value) || 0;
+    var all = runs.A.concat(runs.B);
+    all.forEach(function (r) {
+      var fail = 0, pass = 0;
+      r.steps.forEach(function (s) {
+        if (s.deltaPct === null) { s.status = 'na'; return; }
+        if (Math.abs(s.deltaPct) <= thresholds.step) { s.status = 'pass'; pass++; }
+        else { s.status = 'fail'; fail++; }
+      });
+      r.summary.passSteps = pass;
+      r.summary.failSteps = fail;
+      r.summary.runPass = (r.summary.runDeltaPct === null) ? 'na'
+        : (Math.abs(r.summary.runDeltaPct) <= thresholds.run ? 'pass' : 'fail');
+    });
+    buildDashboard();
+  }
+
+  function buildDashboard() {
+    preparePresets();
+    recomputeSilent();
+    $('dash').style.display = 'flex';
+    // Keep the (now compact) pick row visible so either folder can be swapped
+    // or re-dropped without reloading both.
+    $('pick-screen').style.display = '';
+    $('pick-row').classList.add('compact');
+    $('pick-status').style.display = 'none';
+    $('header-actions').style.display = 'block';
+
+    var all = runs.A.concat(runs.B);
+    $('kpi-files').textContent = all.length;
+    $('kpi-a').textContent = runs.A.length;
+    $('kpi-b').textContent = runs.B.length;
+
+    // ---- KPI cards
+    var aAct = sum(runs.A, 'actTotal'), bAct = sum(runs.B, 'actTotal');
+    var aSet = sumSet(runs.A), bSet = sumSet(runs.B);
+    var aSteps = sum(runs.A, 'stepCount'), bSteps = sum(runs.B, 'stepCount');
+    var aFail = sum(runs.A, 'failSteps'), bFail = sum(runs.B, 'failSteps');
+    var dAct = (runs.A.length && runs.B.length) ? (bAct - aAct) : null;
+    var dPct = (dAct !== null && aAct > 0) ? (dAct / aAct) * 100 : null;
+    var aWall = sum(runs.A, 'wall'), bWall = sum(runs.B, 'wall');
+    var flagged = all.filter(function (r) { return r.flags.some(function (f) { return f.lvl !== 'ok'; }); }).length;
+    var estRuns = all.filter(function (r) {
+      return r.isEda && r.steps.some(function (s) { return s.setSource === 'estimate'; });
+    }).length;
+    $('kpi-total').textContent = fmtDur(aAct) + ' (A) vs ' + fmtDur(bAct) + ' (B) actual';
+
+    var cards = [
+      card('Folder A \u2013 \u03a3 actual', fmtDur(aAct), runs.A.length + ' run(s), ' + aSteps + ' steps'),
+      card('Folder B \u2013 \u03a3 actual', fmtDur(bAct), runs.B.length + ' run(s), ' + bSteps + ' steps'),
+      card('B \u2212 A actual time', (dAct === null ? '\u2014' : fmtSignedDur(dAct)),
+        dPct === null ? 'needs both folders' : fmtPct(dPct) + ' of A',
+        dPct !== null && Math.abs(dPct) > thresholds.run ? 'var(--danger)' : null),
+      card('\u03a3 preset (A / B)', fmtDur(aSet) + ' / ' + fmtDur(bSet),
+        (aSet === null || bSet === null) ? 'missing in a rev < 1.5 folder'
+          : (estRuns ? 'includes estimated EDA presets (' + estRuns + ' run(s))'
+                     : 'per-run deviation tolerated: \u00b1' + thresholds.run + '%')),
+      card('Wall clock A / B', fmtDur(aWall) + ' / ' + fmtDur(bWall), 'tbl_run start \u2192 end (test-step span as fallback)'),
+      card('Timing deviations (steps)', String(aFail + bFail) + ' of ' + (aSteps + bSteps),
+        'per-step tolerance \u00b1' + thresholds.step + '%',
+        (aFail + bFail) > 0 ? 'var(--warning)' : 'var(--success)'),
+      card('Logs with compliance notes', String(flagged) + ' of ' + all.length,
+        'naming rule / timestamp precision', flagged > 0 ? 'var(--warning)' : 'var(--success)')
+    ];
+    $('summary-cards').innerHTML = cards.join('');
+
+    buildLotTable();
+    buildSlotTable();
+    buildQualityTable();
+    fillRunSelectors();
+    drawStepChart();
+    drawSlotChart();
+    drawTrendChart();
+    renderDetail();
+
+    var a0 = runs.A[0] || runs.B[0];
+    $('print-summary').textContent =
+      'Folder A: ' + (runs.A.length ? runs.A.map(function (r) { return 'Slot ' + (r.slot || '?') + '/' + (r.lot || '?'); }).join(', ') : 'none') +
+      '   |   Folder B: ' + (runs.B.length ? runs.B.map(function (r) { return 'Slot ' + (r.slot || '?') + '/' + (r.lot || '?'); }).join(', ') : 'none') +
+      (a0 ? '   |   Plant ' + (a0.identity.plant || '?') + '   |   Program ' + (a0.identity.program || '?') : '');
+  }
+
+  function recomputeSilent() {
+    var all = runs.A.concat(runs.B);
+    all.forEach(function (r) {
+      var fail = 0, pass = 0;
+      r.steps.forEach(function (s) {
+        if (s.deltaPct === null) { s.status = 'na'; return; }
+        if (Math.abs(s.deltaPct) <= thresholds.step) { s.status = 'pass'; pass++; } else { s.status = 'fail'; fail++; }
+      });
+      r.summary.passSteps = pass;
+      r.summary.failSteps = fail;
+      r.summary.runPass = (r.summary.runDeltaPct === null) ? 'na'
+        : (Math.abs(r.summary.runDeltaPct) <= thresholds.run ? 'pass' : 'fail');
+    });
+  }
+
+  function card(label, val, sub, color) {
+    return '<div class="meta-card"><div class="meta-label">' + esc(label) + '</div><div class="meta-val"' +
+      (color ? ' style="color:' + color + '"' : '') + '>' + esc(val) + '</div><div class="meta-sub">' + esc(sub) + '</div></div>';
+  }
+  function sum(list, key) {
+    var vals = list.map(function (r) { return r.summary[key]; }).filter(function (v) { return typeof v === 'number' && !isNaN(v); });
+    return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
+  }
+  function sumSet(list) {
+    var vals = list.map(function (r) { return r.summary.setTotal; }).filter(function (v) { return v !== null; });
+    return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
+  }
+
+  // -------------------------------------------------- A <-> B pairing
+  function pairRuns() {
+    if (!runs.A.length || !runs.B.length) return [];
+    var bibA = {}, bibB = {};
+    runs.A.forEach(function (r) { if (r.slot) bibA[r.slot] = r; });
+    runs.B.forEach(function (r) { if (r.slot) bibB[r.slot] = r; });
+    var shared = Object.keys(bibA).filter(function (k) { return bibB[k]; });
+    if (shared.length) {
+      pairMode = 'bib';
+      return shared.sort(function (x, y) { return (+x) - (+y); }).map(function (k) {
+        return { key: 'Slot ' + k, a: bibA[k], b: bibB[k] };
+      });
+    }
+    pairMode = 'order';
+    var n = Math.max(runs.A.length, runs.B.length), out = [];
+    for (var i = 0; i < n; i++) {
+      out.push({
+        key: 'Run ' + (i + 1),
+        a: runs.A[i] || null, b: runs.B[i] || null
+      });
+    }
+    return out;
+  }
+
+  function buildSlotTable() {
+    var pairs = pairRuns();
+    $('slot-badge').textContent = pairs.length + ' pair(s)';
+    $('slot-note').textContent = pairMode === 'bib'
+      ? 'Runs paired by BIB position (slot) \u2013 both folders share the same slot numbers.'
+      : 'Folders share no slot numbers, so runs are paired by order (A1\u2194B1, A2\u2194B2, \u2026).';
+
+    var headers = ['Pair', 'Slot A', 'Lot A', 'Slot B', 'Lot B',
+      '\u03a3 preset A', '\u03a3 actual A', 'Dev A', '\u03a3 preset B', '\u03a3 actual B', 'Dev B',
+      '\u0394 actual (B\u2212A)', '\u0394 %', 'Verdict'];
+    $('slot-head').innerHTML = headers.map(function (h) { return '<th>' + h + '</th>'; }).join('');
+
+    var body = $('slot-body');
+    body.innerHTML = '';
+    pairs.forEach(function (p) {
+      var a = p.a, b = p.b;
+      var dAct = (a && b && a.summary.actTotal !== null && b.summary.actTotal !== null)
+        ? b.summary.actTotal - a.summary.actTotal : null;
+      var dPct = (dAct !== null && a.summary.actTotal > 0) ? (dAct / a.summary.actTotal) * 100 : null;
+      var verdict = dPct === null ? '\u2014' : (Math.abs(dPct) <= thresholds.run ? 'within ' + thresholds.run + '%' : 'outside ' + thresholds.run + '%');
+      var cls = dPct === null ? 'cell-na' : (Math.abs(dPct) <= thresholds.run ? 'cell-pass' : 'cell-fail');
+      var cells = [
+        p.key,
+        a ? (a.slot || '?') : '\u2014', a ? (a.lot || '\u2014') : '\u2014',
+        b ? (b.slot || '?') : '\u2014', b ? (b.lot || '\u2014') : '\u2014',
+        a ? fmtDur(a.summary.setTotal) : '\u2014',
+        a ? fmtDur(a.summary.actTotal) : '\u2014',
+        a ? fmtPct(a.summary.runDeltaPct) : '\u2014',
+        b ? fmtDur(b.summary.setTotal) : '\u2014',
+        b ? fmtDur(b.summary.actTotal) : '\u2014',
+        b ? fmtPct(b.summary.runDeltaPct) : '\u2014',
+        dAct === null ? '\u2014' : fmtSignedDur(dAct),
+        dPct === null ? '\u2014' : fmtPct(dPct),
+        verdict
+      ];
+      var tr = document.createElement('tr');
+      tr.innerHTML = cells.map(function (v, i) {
+        var c = (i >= 5) ? ' class="num"' : '';
+        if (i === 13) c = ' class="' + cls + '"';
+        return '<td' + c + '>' + esc(v) + '</td>';
+      }).join('');
+      body.appendChild(tr);
+    });
+  }
+
+  function buildLotTable() {
+    function group(list) {
+      var g = {};
+      list.forEach(function (r) {
+        var k = r.lot || '(no lot)';
+        if (!g[k]) g[k] = { lot: k, runs: 0, set: 0, hasSet: false, act: 0, wall: 0, steps: 0, fail: 0, ovens: {} };
+        var e = g[k];
+        e.runs++; e.act += r.summary.actTotal || 0; e.steps += r.summary.stepCount;
+        e.fail += r.summary.failSteps;
+        e.wall += r.summary.wall || 0;
+        if (r.summary.setTotal !== null) { e.hasSet = true; e.set += r.summary.setTotal; }
+        e.ovens[r.identity.oven || '?'] = 1;
+      });
+      return Object.keys(g).map(function (k) { return g[k]; });
+    }
+    var ga = group(runs.A), gb = group(runs.B);
+    var keys = [];
+    ga.forEach(function (g) { if (keys.indexOf(g.lot) < 0) keys.push(g.lot); });
+    gb.forEach(function (g) { if (keys.indexOf(g.lot) < 0) keys.push(g.lot); });
+
+    $('lot-badge').textContent = keys.length + ' lot(s)';
+    var headers = ['Folder', 'Lot', 'Ovens', 'Runs', 'Steps', '\u03a3 preset', '\u03a3 actual', 'Deviation', 'Wall clock', 'Dev steps'];
+    $('lot-head').innerHTML = headers.map(function (h) { return '<th>' + h + '</th>'; }).join('');
+
+    var body = $('lot-body');
+    body.innerHTML = '';
+    function row(folder, g) {
+      if (!g) return;
+      var dev = g.hasSet && g.set > 0 ? ((g.act - g.set) / g.set) * 100 : null;
+      var tr = document.createElement('tr');
+      tr.innerHTML = [folder, g.lot, Object.keys(g.ovens).join(', '), g.runs, g.steps,
+        g.hasSet ? fmtDur(g.set) : '\u2014', fmtDur(g.act), fmtPct(dev), fmtDur(g.wall), g.fail]
+        .map(function (v, i) {
+          var cls = i >= 3 ? ' class="num"' : '';
+          if (i === 7 && dev !== null) cls = ' class="num ' + (Math.abs(dev) <= thresholds.run ? 'cell-pass' : 'cell-fail') + '"';
+          return '<td' + cls + '>' + esc(v) + '</td>';
+        }).join('');
+      body.appendChild(tr);
+    }
+    keys.forEach(function (k) {
+      row('A', ga.find(function (g) { return g.lot === k; }));
+      row('B', gb.find(function (g) { return g.lot === k; }));
+    });
+    if (!keys.length) body.innerHTML = '<tr><td colspan="10" class="cell-na">No runs loaded.</td></tr>';
+  }
+
+  function buildQualityTable() {
+    var all = runs.A.concat(runs.B);
+    $('quality-badge').textContent = all.length + ' run(s)';
+    var headers = ['Folder', 'File', 'Customer tag', 'Plant', 'Run start', 'Slot', 'Lot', 'Program', 'DUT / Package',
+      'BiDFRev', 'Parts / Good', 'Step range', 'Notes'];
+    $('quality-head').innerHTML = headers.map(function (h) { return '<th>' + h + '</th>'; }).join('');
+    var body = $('quality-body');
+    body.innerHTML = '';
+    ['A', 'B'].forEach(function (slot) {
+      runs[slot].forEach(function (r) {
+        var id = r.identity;
+        var notes = r.flags.length
+          ? r.flags.map(function (f) { return '<span class="flag flag-' + (f.lvl === 'bad' ? 'bad' : 'warn') + '">' + esc(f.text) + '</span>'; }).join('')
+          : '<span class="flag flag-ok">follows the naming rule</span>';
+        var first = r.steps.length ? r.steps[0].test_index : '';
+        var last = r.steps.length ? r.steps[r.steps.length - 1].test_index : '';
+        var tr = document.createElement('tr');
+        tr.innerHTML = [slot, r.name, id.customer || '\u2014', id.plant || '\u2014',
+          id.runStart ? fmtTs(id.runStart.ms) : '\u2014', r.slot || '\u2014', id.lot || '\u2014',
+          id.program || '\u2014', (id.dut || '\u2014') + (id.pkg ? ' / ' + id.pkg : ''),
+          id.rev || '\u2014',
+          (id.parts === null ? '\u2014' : id.parts) + ' / ' + (id.good === null ? '\u2014' : id.good),
+          first + '\u2013' + last, notes]
+          .map(function (v, i) { return '<td' + (i === 11 ? ' class="num"' : '') + '>' + (i === 12 ? v : esc(v)) + '</td>'; }).join('');
+        body.appendChild(tr);
+      });
+    });
+    if (!all.length) body.innerHTML = '<tr><td colspan="13" class="cell-na">No runs loaded.</td></tr>';
+  }
+
+  // ------------------------------------------------------------ charting
+  function fillRunSelectors() {
+    var all = [];
+    runs.A.forEach(function (r, i) { all.push({ label: 'A' + (i + 1) + ' \u00b7 ' + r.name, r: r }); });
+    runs.B.forEach(function (r, i) { all.push({ label: 'B' + (i + 1) + ' \u00b7 ' + r.name, r: r }); });
+    ['step-run', 'detail-run'].forEach(function (id) {
+      var sel = $(id);
+      var keep = sel.value;
+      sel.innerHTML = '';
+      all.forEach(function (o, i) {
+        var opt = document.createElement('option');
+        opt.value = String(i); opt.textContent = o.label;
+        sel.appendChild(opt);
+      });
+      if (keep && all[+keep]) sel.value = keep;
+    });
+  }
+
+  function selectedRun(id) {
+    var idx = parseInt($(id).value, 10);
+    var all = runs.A.concat(runs.B);
+    return all[idx] || null;
+  }
+
+  function chartColors(a, b) {
+    return { a: a, b: b };
+  }
+
+  function drawStepChart() {
+    var r = selectedRun('step-run');
+    if (!r || !window.Chart) return;
+    if (charts.steps) charts.steps.destroy();
+    var labels = r.steps.map(function (s, i) {
+      var nm = String(s.name || '').trim();
+      return (s.test_index === null || s.test_index === '' ? (i + 1) : s.test_index) + (nm ? ' \u00b7 ' + nm : '');
+    });
+    var setData = r.steps.map(function (s) { return s.set === null ? null : +(s.set / 60).toFixed(3); });
+    var actData = r.steps.map(function (s) { return s.actual === null ? null : +(s.actual / 60).toFixed(3); });
+    var tsData = r.steps.map(function (s) { return s.tsDelta === null ? null : +(s.tsDelta / 60).toFixed(3); });
+
+    charts.steps = new Chart($('chart-steps').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Preset (exec_set)', data: setData, backgroundColor: 'rgba(0,103,192,0.55)', borderColor: 'rgba(0,103,192,0.9)', borderWidth: 1 },
+          { label: 'Actual (exec_time)', data: actData, backgroundColor: 'rgba(212,53,28,0.55)', borderColor: 'rgba(212,53,28,0.9)', borderWidth: 1 },
+          { label: 'Actual (end \u2212 start)', data: tsData, type: 'line', borderColor: 'rgba(16,124,65,0.85)',
+            backgroundColor: 'rgba(16,124,65,0.12)', pointRadius: 3, borderWidth: 2, tension: 0.25, spanGaps: true }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+          tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + (c.parsed.y === null ? '\u2014' : c.parsed.y + ' min'); } } },
+          title: { display: true, text: r.name + (hasNoPreset(r) ? '  (no preset time in this revision)' : ''), font: { size: 11, weight: 'normal' } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 9 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
+          y: { title: { display: true, text: 'minutes', font: { size: 10 } }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  function drawSlotChart() {
+    if (!window.Chart) return;
+    if (charts.slots) charts.slots.destroy();
+    var pairs = pairRuns();
+    var labels = pairs.map(function (p) { return p.key; });
+    var aData = pairs.map(function (p) { return p.a ? +(p.a.summary.actTotal / 60).toFixed(3) : null; });
+    var bData = pairs.map(function (p) { return p.b ? +(p.b.summary.actTotal / 60).toFixed(3) : null; });
+    var aSet = pairs.map(function (p) { return p.a && p.a.summary.setTotal !== null ? +(p.a.summary.setTotal / 60).toFixed(3) : null; });
+    var bSet = pairs.map(function (p) { return p.b && p.b.summary.setTotal !== null ? +(p.b.summary.setTotal / 60).toFixed(3) : null; });
+
+    charts.slots = new Chart($('chart-slots').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels.length ? labels : ['no runs'],
+        datasets: [
+          { label: 'A preset', data: labels.length ? aSet : [null], backgroundColor: 'rgba(0,103,192,0.25)', borderColor: 'rgba(0,103,192,0.6)', borderWidth: 1 },
+          { label: 'A actual', data: labels.length ? aData : [null], backgroundColor: 'rgba(0,103,192,0.75)', borderColor: 'rgba(0,103,192,1)', borderWidth: 1 },
+          { label: 'B preset', data: labels.length ? bSet : [null], backgroundColor: 'rgba(212,53,28,0.25)', borderColor: 'rgba(212,53,28,0.6)', borderWidth: 1 },
+          { label: 'B actual', data: labels.length ? bData : [null], backgroundColor: 'rgba(212,53,28,0.75)', borderColor: 'rgba(212,53,28,1)', borderWidth: 1 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+          tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + (c.parsed.y === null ? '\u2014' : c.parsed.y + ' min'); } } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 9 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
+          y: { title: { display: true, text: 'minutes', font: { size: 10 } }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  function drawTrendChart() {
+    if (!window.Chart) return;
+    if (charts.trend) charts.trend.destroy();
+    var pairs = pairRuns();
+    var labels = pairs.map(function (p) { return p.key; });
+    var aDev = pairs.map(function (p) { return p.a && p.a.summary.runDeltaPct !== null ? +p.a.summary.runDeltaPct.toFixed(2) : null; });
+    var bDev = pairs.map(function (p) { return p.b && p.b.summary.runDeltaPct !== null ? +p.b.summary.runDeltaPct.toFixed(2) : null; });
+
+    charts.trend = new Chart($('chart-trend').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels.length ? labels : ['no runs'],
+        datasets: [
+          { label: 'A \u2013 deviation from preset (%)', data: labels.length ? aDev : [null], borderColor: 'rgba(0,103,192,0.9)',
+            backgroundColor: 'rgba(0,103,192,0.15)', pointRadius: 4, borderWidth: 2, tension: 0.25, fill: true, spanGaps: true },
+          { label: 'B \u2013 deviation from preset (%)', data: labels.length ? bDev : [null], borderColor: 'rgba(212,53,28,0.9)',
+            backgroundColor: 'rgba(212,53,28,0.15)', pointRadius: 4, borderWidth: 2, tension: 0.25, fill: true, spanGaps: true },
+          { label: '+ tolerance', data: labels.length ? labels.map(function () { return thresholds.run; }) : [null],
+            borderColor: 'rgba(0,0,0,0.35)', borderDash: [5, 4], borderWidth: 1, pointRadius: 0, fill: false },
+          { label: '\u2212 tolerance', data: labels.length ? labels.map(function () { return -thresholds.run; }) : [null],
+            borderColor: 'rgba(0,0,0,0.35)', borderDash: [5, 4], borderWidth: 1, pointRadius: 0, fill: false }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+          tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + (c.parsed.y === null ? '\u2014' : c.parsed.y + '%'); } } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 9 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
+          y: { title: { display: true, text: 'deviation %', font: { size: 10 } }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --------------------------------------------------------- detail table
+  function renderDetail() {
+    var r = selectedRun('detail-run');
+    var showExtras = $('show-extras').checked;
+    renderPresetBar(r);
+    if (!r) return;
+    var headers = ['TestSeq', 'Seg', 'TestSecName', 'Start Time', 'End Time', 'Preset', 'Actual', '\u0394', '\u0394 %', 'Status'];
+    if (showExtras) headers = headers.concat(['Actual (end\u2212start)', 'Gap before', 'Temp \u00b0C', 'Temp set \u00b0C']);
+    $('detail-head').innerHTML = headers.map(function (h) { return '<th>' + h + '</th>'; }).join('');
+    $('detail-badge').textContent = r.steps.length + ' steps';
+
+    var body = $('detail-body');
+    body.innerHTML = '';
+    r.steps.forEach(function (s) {
+      var stCls = s.status === 'pass' ? 'cell-pass' : s.status === 'fail' ? 'cell-fail' : 'cell-na';
+      var html = '';
+      html += '<td>' + esc(s.test_index) + '</td>';
+      html += '<td>' + esc(s.segment) + '</td>';
+      html += '<td>' + esc(s.name || '') + '</td>';
+      html += '<td>' + esc(fmtTs(s.start)) + '</td>';
+      html += '<td>' + esc(fmtTs(s.end)) + '</td>';
+      html += presetCellHtml(r, s);
+      html += '<td class="num">' + fmtDur(s.actual) + '</td>';
+      html += '<td class="num">' + fmtSignedDur(s.delta) + '</td>';
+      html += '<td class="num ' + stCls + '">' + fmtPct(s.deltaPct) + '</td>';
+      html += '<td class="' + stCls + '">' + (s.status === 'na' ? 'n/a' : s.status.toUpperCase()) + '</td>';
+      if (showExtras) {
+        html += '<td class="num">' + fmtDur(s.tsDelta) + '</td>';
+        html += '<td class="num">' + (s.gap === null || s.gap === undefined ? '\u2014' : Math.round(s.gap) + ' s') + '</td>';
+        html += '<td class="num">' + (s.temperature === null ? '\u2014' : s.temperature.toFixed(1)) + '</td>';
+        html += '<td class="num">' + (s.temp_set === null ? '\u2014' : s.temp_set.toFixed(1)) + '</td>';
+      }
+      var tr = document.createElement('tr');
+      tr.innerHTML = html;
+      body.appendChild(tr);
+    });
+
+    var tot = document.createElement('tr');
+    tot.style.fontWeight = 'bold';
+    tot.style.background = '#f0f0f0';
+    var tCells = ['TOTAL', '', r.steps.length + ' steps', fmtTs(r.steps.length ? r.steps[0].start : null),
+      fmtTs(r.steps.length ? r.steps[r.steps.length - 1].end : null),
+      fmtDur(r.summary.setTotal), fmtDur(r.summary.actTotal), fmtSignedDur(r.summary.runDelta),
+      fmtPct(r.summary.runDeltaPct), (r.summary.runPass === 'na' ? 'n/a' : r.summary.runPass.toUpperCase())];
+    var totHtml = tCells.map(function (v, i) {
+      return '<td' + (i >= 5 && i <= 8 ? ' class="num"' : '') + ' style="border-top:2px solid #999">' + esc(v) + '</td>';
+    }).join('');
+    if (showExtras) {
+      totHtml += '<td class="num" style="border-top:2px solid #999">' + fmtDur(r.summary.tsTotal) + '</td>';
+      totHtml += '<td class="num" style="border-top:2px solid #999">' + fmtDur(r.summary.gapTotal) + '</td>';
+      totHtml += '<td style="border-top:2px solid #999"></td><td style="border-top:2px solid #999"></td>';
+    }
+    tot.innerHTML = totHtml;
+    body.appendChild(tot);
+
+    var id = r.identity;
+    var noteHtml =
+      '<strong>' + esc(r.name) + '</strong> &middot; folder slot ' + (r.slot || '?') + ' &middot; lot ' + esc(id.lot || '?') +
+      ' &middot; oven ' + esc(id.oven || '?') + ' &middot; program ' + esc(id.program || '?') +
+      ' &middot; BiDFRev ' + esc(id.rev || '?') + ' &middot; wall clock ' + fmtDur(r.summary.wall) +
+      ' (' + esc(r.summary.wallSource || '') + ')' +
+      ' &middot; tolerances: step &plusmn;' + thresholds.step + '%, run &plusmn;' + thresholds.run + '%';
+    if (hasNoPreset(r)) {
+      noteHtml += ' &middot; <span style="color:var(--warning)">preset time unavailable in this revision</span>';
+    }
+    if (r.isEda) {
+      var st = presetStats(r);
+      if (st.estimate) {
+        noteHtml += ' &middot; <span class="preset-legend"><span class="preset-tilde">~</span> ' + st.estimate +
+          ' estimated preset' + (st.estimate === 1 ? '' : 's') + ' \u2013 not measured</span>';
+      }
+      if (st.manual) {
+        noteHtml += ' &middot; <span style="color:#005a9e">' + st.manual + ' entered manually</span>';
+      }
+      if (st.none) {
+        noteHtml += ' &middot; <span class="preset-legend">' + st.none + ' without a preset</span>';
+      }
+    }
+    $('detail-note').innerHTML = noteHtml;
+  }
+
+  // ------------------------------------------------------------- exports
+  function exportToXLSX() {
+    if (!runs.A.length && !runs.B.length) { showToast('Nothing to export.', 'danger'); return; }
+    showProgress('Compiling XLSX report\u2026', 4, 'Export');
+    setTimeout(function () {
+      try { exportSync(); hideProgress(); showToast('Analysis workbook exported.'); }
+      catch (e) { hideProgress(); showToast('Export failed: ' + e.message, 'danger'); }
+    }, 80);
+  }
+
+  function exportSync() {
+    var wb = XLSX.utils.book_new();
+    var HDR = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '0067C0' } },
+      alignment: { horizontal: 'center', vertical: 'center' } };
+    var BORDER = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+    function widen(rows, headers) {
+      return headers.map(function (h, i) {
+        var len = String(h).length;
+        for (var r = 1; r < rows.length; r++) {
+          var v = rows[r][i];
+          if (v !== null && v !== undefined) len = Math.max(len, String(v).length);
+        }
+        return { wch: Math.min(Math.max(len + 2, 9), 46) };
+      });
+    }
+    function styleSheet(ws, headers, rows, colourCols) {
+      var range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      for (var c = range.s.c; c <= range.e.c; c++) {
+        var ref = XLSX.utils.encode_cell({ r: 0, c: c });
+        if (ws[ref]) ws[ref].s = HDR;
+      }
+      for (var r = 1; r <= range.e.r; r++) {
+        for (var c2 = range.s.c; c2 <= range.e.c; c2++) {
+          var cell = ws[XLSX.utils.encode_cell({ r: r, c: c2 })];
+          if (!cell) continue;
+          cell.s = { alignment: { horizontal: 'center', vertical: 'center' }, border: BORDER };
+          if (colourCols && colourCols[c2] !== undefined) {
+            var v = colourCols[c2].valueOf(rows[r]);
+            var cls = colourCols[c2](rows[r]);
+            if (cls) { cell.s.fill = { fgColor: { rgb: cls === 'fail' ? 'FBD5D7' : 'D7F0DE' } }; cell.s.font = { color: { rgb: cls === 'fail' ? '9C0006' : '006100' } }; }
+          }
+        }
+      }
+      ws['!cols'] = widen(rows, headers);
+    }
+
+    // ---- Summary sheet
+    var all = runs.A.concat(runs.B);
+    var sHead = ['Section', 'Item', 'Value'];
+    var sRows = [sHead];
+    function push(k, v) { sRows.push(['Summary', k, v]); }
+    var aAct = sum(runs.A, 'actTotal'), bAct = sum(runs.B, 'actTotal');
+    var aSet = sumSet(runs.A), bSet = sumSet(runs.B);
+    push('Folder A runs', runs.A.length);
+    push('Folder B runs', runs.B.length);
+    push('Folder A \u03a3 preset', fmtDur(aSet));
+    push('Folder A \u03a3 actual', fmtDur(aAct));
+    push('Folder A deviation', fmtPct(aSet && aAct !== null ? ((aAct - aSet) / aSet) * 100 : null));
+    push('Folder B \u03a3 preset', fmtDur(bSet));
+    push('Folder B \u03a3 actual', fmtDur(bAct));
+    push('Folder B deviation', fmtPct(bSet && bAct !== null ? ((bAct - bSet) / bSet) * 100 : null));
+    push('\u0394 actual (B \u2212 A)', (aAct !== null && bAct !== null) ? fmtSignedDur(bAct - aAct) : '\u2014');
+    push('\u0394 % (B vs A)', (aAct && bAct !== null) ? fmtPct(((bAct - aAct) / aAct) * 100) : '\u2014');
+    push('Tolerance per step', thresholds.step + ' %');
+    push('Tolerance per run', thresholds.run + ' %');
+    push('Deviating steps', sum(runs.A, 'failSteps') + sum(runs.B, 'failSteps'));
+    // EDA preset provenance - only present when an EDA run was loaded, so a
+    // COBIS-only workbook is unchanged.
+    all.forEach(function (r) {
+      if (!r.isEda) return;
+      var est = presetStats(r);
+      push('EDA preset \u2013 ' + runTag(r) + ' / ' + (r.lot || r.name),
+        est.estimate + ' estimated' + (r.estRefLabel ? ' from ' + r.estRefLabel : '') +
+        (r.estOffset ? ' (' + (r.estAuto ? 'auto ' : '') + 'offset +' + r.estOffset + ')' : '') +
+        ', ' + est.manual + ' manual, ' + est.file + ' from file, ' + est.none + ' empty');
+    });
+    var wsSum = XLSX.utils.aoa_to_sheet(sRows);
+    styleSheet(wsSum, sHead, sRows, null);
+    XLSX.utils.book_append_sheet(wb, wsSum, 'Summary');
+
+    // ---- A vs B sheet
+    var pairs = pairRuns();
+    var cHead = ['Pair', 'Slot A', 'Lot A', 'Oven A', 'Slot B', 'Lot B', 'Oven B',
+      '\u03a3 preset A', '\u03a3 actual A', 'Dev A %', '\u03a3 preset B', '\u03a3 actual B', 'Dev B %',
+      '\u0394 actual (B\u2212A)', '\u0394 %', 'Verdict'];
+    var cRows = [cHead];
+    pairs.forEach(function (p) {
+      var a = p.a, b = p.b;
+      var dAct = (a && b) ? (b.summary.actTotal - a.summary.actTotal) : null;
+      var dPct = (dAct !== null && a.summary.actTotal > 0) ? (dAct / a.summary.actTotal) * 100 : null;
+      cRows.push([
+        p.key, a ? a.slot : '', a ? a.lot : '', a ? a.identity.oven : '',
+        b ? b.slot : '', b ? b.lot : '', b ? b.identity.oven : '',
+        a ? fmtDur(a.summary.setTotal) : '', a ? fmtDur(a.summary.actTotal) : '',
+        a && a.summary.runDeltaPct !== null ? +a.summary.runDeltaPct.toFixed(2) : '',
+        b ? fmtDur(b.summary.setTotal) : '', b ? fmtDur(b.summary.actTotal) : '',
+        b && b.summary.runDeltaPct !== null ? +b.summary.runDeltaPct.toFixed(2) : '',
+        dAct === null ? '' : +(dAct / 60).toFixed(2), dPct === null ? '' : +dPct.toFixed(2),
+        dPct === null ? '' : (Math.abs(dPct) <= thresholds.run ? 'within tolerance' : 'outside tolerance')
+      ]);
+    });
+    var wsCmp = XLSX.utils.aoa_to_sheet(cRows);
+    styleSheet(wsCmp, cHead, cRows, {
+      14: function (r) { return (typeof r[14] === 'number') ? (Math.abs(r[14]) <= thresholds.run ? 'pass' : 'fail') : null; },
+      9: function (r) { return (typeof r[9] === 'number') ? (Math.abs(r[9]) <= thresholds.run ? 'pass' : 'fail') : null; },
+      12: function (r) { return (typeof r[12] === 'number') ? (Math.abs(r[12]) <= thresholds.run ? 'pass' : 'fail') : null; }
+    });
+    XLSX.utils.book_append_sheet(wb, wsCmp, 'A vs B');
+
+    // ---- Lot sheet
+    var lHead = ['Folder', 'Lot', 'Ovens', 'Runs', 'Steps', '\u03a3 preset', '\u03a3 actual', 'Dev %', 'Wall clock', 'Dev steps'];
+    var lRows = [lHead];
+    function lots(list, folder) {
+      var g = {};
+      list.forEach(function (r) {
+        var k = r.lot || '(no lot)';
+        if (!g[k]) g[k] = { lot: k, runs: 0, set: 0, hasSet: false, act: 0, wall: 0, steps: 0, fail: 0, ovens: {} };
+        var e = g[k];
+        e.runs++; e.act += r.summary.actTotal || 0; e.steps += r.summary.stepCount; e.fail += r.summary.failSteps;
+        e.wall += r.summary.wall || 0;
+        if (r.summary.setTotal !== null) { e.hasSet = true; e.set += r.summary.setTotal; }
+        e.ovens[r.identity.oven || '?'] = 1;
+      });
+      Object.keys(g).forEach(function (k) {
+        var e = g[k];
+        lRows.push([folder, e.lot, Object.keys(e.ovens).join(', '), e.runs, e.steps,
+          e.hasSet ? fmtDur(e.set) : '', fmtDur(e.act),
+          (e.hasSet && e.set > 0) ? +(((e.act - e.set) / e.set) * 100).toFixed(2) : '',
+          fmtDur(e.wall), e.fail]);
+      });
+    }
+    lots(runs.A, 'A'); lots(runs.B, 'B');
+    var wsLot = XLSX.utils.aoa_to_sheet(lRows);
+    styleSheet(wsLot, lHead, lRows, {
+      7: function (r) { return (typeof r[7] === 'number') ? (Math.abs(r[7]) <= thresholds.run ? 'pass' : 'fail') : null; }
+    });
+    XLSX.utils.book_append_sheet(wb, wsLot, 'Lot to lot');
+
+    // ---- Quality sheet
+    var qHead = ['Folder', 'File', 'Customer tag', 'Plant', 'Run start', 'Slot', 'Lot', 'Program',
+      'DUT', 'Package', 'BiDFRev', 'Parts', 'Good', 'Steps', 'Notes'];
+    var qRows = [qHead];
+    ['A', 'B'].forEach(function (slot) {
+      runs[slot].forEach(function (r) {
+        var id = r.identity;
+        qRows.push([slot, r.name, id.customer, id.plant, id.runStart ? fmtTs(id.runStart.ms) : '', r.slot, id.lot,
+          id.program, id.dut, id.pkg, id.rev, id.parts, id.good, r.steps.length,
+          r.flags.length ? r.flags.map(function (f) { return f.text; }).join(' | ') : 'follows the naming rule']);
+      });
+    });
+    var wsQ = XLSX.utils.aoa_to_sheet(qRows);
+    styleSheet(wsQ, qHead, qRows, null);
+    XLSX.utils.book_append_sheet(wb, wsQ, 'Run identity');
+
+    // ---- one sheet per run (step detail)
+    var anyEda = all.some(function (r) { return r.isEda; });
+    all.forEach(function (r, n) {
+      var head = ['Folder', 'File', 'TestSeq', 'Segment', 'TestSecName', 'Start Time', 'End Time',
+        'Preset', 'Actual', '\u0394', '\u0394 %', 'Status'];
+      if (anyEda) head.push('Preset src');
+      head = head.concat(['Actual (end\u2212start)', 'Gap before (s)', 'Temperature', 'Temp set']);
+      var rows = [head];
+      var folderTag = runs.A.indexOf(r) >= 0 ? 'A' : 'B';
+      r.steps.forEach(function (s) {
+        var row = [folderTag, r.name, s.test_index, s.segment, s.name || '', fmtTs(s.start), fmtTs(s.end),
+          fmtDur(s.set), fmtDur(s.actual), fmtSignedDur(s.delta),
+          s.deltaPct === null ? '' : +s.deltaPct.toFixed(2),
+          s.status === 'na' ? 'n/a' : s.status.toUpperCase()];
+        if (anyEda) row.push(presetSourceLabel(s));
+        rows.push(row.concat([
+          s.tsDelta === null ? '' : Math.round(s.tsDelta),
+          s.gap === null || s.gap === undefined ? '' : Math.round(s.gap),
+          s.temperature === null ? '' : s.temperature, s.temp_set === null ? '' : s.temp_set]));
+      });
+      var totRow = ['', 'TOTAL', '', '', '', '', '',
+        fmtDur(r.summary.setTotal), fmtDur(r.summary.actTotal), fmtSignedDur(r.summary.runDelta),
+        r.summary.runDeltaPct === null ? '' : +r.summary.runDeltaPct.toFixed(2),
+        r.summary.runPass === 'na' ? 'n/a' : r.summary.runPass.toUpperCase()];
+      if (anyEda) totRow.push('');
+      rows.push(totRow.concat([
+        Math.round(r.summary.tsTotal || 0), Math.round(r.summary.gapTotal || 0), '', '']));
+      var ws = XLSX.utils.aoa_to_sheet(rows);
+      styleSheet(ws, head, rows, {
+        10: function (row) { return (typeof row[10] === 'number') ? (Math.abs(row[10]) <= thresholds.step ? 'pass' : 'fail') : null; }
+      });
+      var name = (folderTag + '_' + (r.slot || 'run') + '_' + (r.lot || n)).replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 24);
+      var taken = wb.SheetNames.indexOf(name) >= 0;
+      XLSX.utils.book_append_sheet(wb, ws, taken ? name + '_' + (n + 1) : name);
+    });
+
+    var stamp = new Date();
+    var p2 = function (n) { return String(n).padStart(2, '0'); };
+    var fname = 'P2_Time_Analysis_A-B_' + stamp.getFullYear() + p2(stamp.getMonth() + 1) + p2(stamp.getDate()) +
+      '_' + p2(stamp.getHours()) + p2(stamp.getMinutes()) + '.xlsx';
+    XLSX.writeFile(wb, fname);
+  }
+
+  // ------------------------------------------------------------------ init
+  function resetApp() {
+    runs = { A: [], B: [] };
+    ['a', 'b'].forEach(function (s) {
+      $('path-' + s).textContent = '\u2014';
+      $('count-' + s).textContent = '';
+      $('pick-' + s).classList.remove('loaded', 'dragover');
+    });
+    $('pick-row').classList.remove('compact');
+    $('preset-bar').style.display = 'none';
+    if (charts.steps) { charts.steps.destroy(); charts.steps = null; }
+    if (charts.slots) { charts.slots.destroy(); charts.slots = null; }
+    if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
+    $('dash').style.display = 'none';
+    $('pick-screen').style.display = '';
+    $('header-actions').style.display = 'none';
+    updatePickStatus();
+  }
+
+  window.addEventListener('load', function () {
+    $('tol-step').addEventListener('change', recompute);
+    $('tol-run').addEventListener('change', recompute);
+    $('show-extras').addEventListener('change', renderDetail);
+    $('detail-body').addEventListener('change', onDetailPresetChange);
+    $('detail-body').addEventListener('keydown', onDetailPresetKey);
+    updatePickStatus();
+    showToast('Ready. Select or drop folder A and folder B to compare preset vs actual test time.');
+  });
+  </script>
+</body>
+</html>
