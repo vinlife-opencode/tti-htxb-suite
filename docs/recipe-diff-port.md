@@ -1,10 +1,9 @@
 # Porting `recipe-diff` to C#
 
-**Status: implemented 2026-10-31.** The C# command reproduces the Python tool on
-all 16 pairs of the 261028 delivery (parity `16 same, 0 different`), and
-`test-recipetool.ps1` runs it as part of the gate (`50 passed`). The Python
-command remains as the reference until a second green parity run, then it is
-deleted (step 7 below).
+**Status: complete, 2026-10-31.** The C# command reproduced the Python tool on
+all 16 pairs of the 261028 delivery (parity `16 same, 0 different`, two green
+runs), `test-recipetool.ps1` runs it as part of the gate (`50 passed`), and
+the Python command has been deleted. Step 7 is done.
 
 Plan for moving the workbook ↔ machine-recipe comparison out of the Python tool
 (`bidfgen recipe-diff`, commit `ff5dcbb`) and into `Htxb.RecipeCore` /
@@ -140,7 +139,7 @@ samples are absent. Result on 2026-10-31: `16 same, 0 different`.
 | 4 | `DiffCommand` + usage text | Tool | done |
 | 5 | Pin `.zadz`, 16-pair baseline | Tests + fixtures | done |
 | 6 | Parity phase in `test-recipetool.ps1` | verification | done |
-| 7 | Delete the Python command after a second green parity run | cleanup | pending |
+| 7 | Delete the Python command after a second green parity run | cleanup | done 2026-10-31 |
 
 ## 10. Risks
 
@@ -159,4 +158,6 @@ samples are absent. Result on 2026-10-31: `16 same, 0 different`.
   `test-recipetool.ps1`. **Met** (`50 passed`).
 - Parity green against the Python tool on the same 16 pairs. **Met** (16/16).
 - The Python `recipe-diff` command is deleted in a separate commit after two green
-  parity runs, with `docs/std-ingest.md` pointing at the C# command. **Pending.**
+  parity runs, with `docs/std-ingest.md` pointing at the C# command. **Met** -
+  BidfGen2 commit retired it and the parity phase was removed from
+  `test-recipetool.ps1`.

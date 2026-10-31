@@ -94,29 +94,7 @@ if ($Zadz)    { $arguments += @('--zadz', $Zadz) }
 & $exe @arguments
 $code = $LASTEXITCODE
 
-# -- parity with the Python tool (its reference until it is retired) --------
-$py = Get-Command py -ErrorAction SilentlyContinue
-if ($Zadz -and $Samples -and $py -and (Test-Path -LiteralPath $tool) -and (Test-Path -LiteralPath (Join-Path $bidfgen 'bidfgen\cli.py'))) {
-    Write-Host ''
-    Write-Host '== parity: Python recipe-diff vs C# diff =='
-    $same = 0; $different = 0
-    foreach ($f in Get-ChildItem $Zadz -Filter *.zadz | Sort-Object Name) {
-        $book = Get-ChildItem $Samples -Recurse -Filter ($f.BaseName + '.xlsx') | Select-Object -First 1
-        if (-not $book) { continue }
-        Push-Location $bidfgen
-        $pyJson = (& py -3.13 -m bidfgen.cli recipe-diff $book.FullName $f.FullName --json 2>&1 | Out-String)
-        Pop-Location
-        $csJson = (& $tool diff $book.FullName $f.FullName --json 2>&1 | Out-String)
-        try {
-            $a = ($pyJson | ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress)
-            $b = ($csJson | ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress)
-            if ($a -eq $b) { $same++ } else { $different++; Write-Host ('  DIFF ' + $f.BaseName) }
-        } catch { $different++; Write-Host ('  FAIL ' + $f.BaseName + ' (unreadable JSON)') }
-    }
-    Write-Host ('  parity: ' + $same + ' same, ' + $different + ' different')
-    if ($different -gt 0) { $code = 1 }
-} else {
-    Write-Host ''
-    Write-Host 'SKIP  parity: Python tool, C# tool or machine recipes not available'
-}
+# The parity phase against the Python recipe-diff lived here. It was removed on
+# 2026-10-31 after two green runs (16 same, 0 different): the Python command is
+# retired and the C# baseline checks in DiffTests are the proof now.
 exit $code

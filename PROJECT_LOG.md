@@ -1256,3 +1256,13 @@ parity vs the Python tool on the same 16 pairs -> `16 same, 0 different`; BidfGe
 (25 exact, 7 alias), the five BR recipes carrying `IGSS_-10V_1` / `IGSS_-10V_3` machine-only;
 SQ 15 paired (14 / 1) with `RAMP_DOWN` machine-only. The Python `recipe-diff` stays as the
 reference until a second green parity run, then it is deleted.
+### 2026-10-31 - retired the Python ecipe-diff
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `test-recipetool.ps1` | Parity phase removed after two green runs (`16 same, 0 different`); the C# baseline checks are the proof now. The tool is still built by the script. |
+| modified | `docs/recipe-diff-port.md` | Status complete; step 7 done. |
+
+The Python command itself was deleted in BidfGen2 (`bidfgen/tools/recipe_diff.py`, its
+`cli.py` dispatch, its checks in `test_onboard.py`). One implementation again.
+`docs/std-ingest.md` there points at `Htxb.RecipeTool diff`.
