@@ -21,4 +21,16 @@ internal static class TestPaths
     /// <summary>The tracked std tables and the profile CSV that selects them.</summary>
     public const string DefaultTables =
         @"D:\_TTI-Dev\_Proj_BidfGen2\handover\fixtures\deploy-config\Recipe_Std_Table";
+
+    /// <summary>The machine recipe export that goes with the 261028 delivery.</summary>
+    public const string DefaultZadz =
+        @"D:\_TTI-Dev\_Proj_BidfGen2\Samples\TTSZ Zhou Rong 261029 New Recipes\261028 TTSZ Zhou Rong 17 Test Plan\Trio-tech_BI_Recipes\2108 Recipe 261031";
+
+    /// <summary>The same recipes, pinned in the repository for a fresh clone.</summary>
+    public const string FixtureZadz =
+        @"D:\_TTI-Dev\_Proj_BidfGen2\handover\fixtures\samples\TTSZ Zhou Rong 261029 New Recipes\261028 TTSZ Zhou Rong 17 Test Plan\Trio-tech_BI_Recipes\2108 Recipe 261031";
+
+    /// <summary>The alias map shared with the Python tool, asserted by both suites.</summary>
+    public const string DefaultAliases =
+        @"D:\_TTI-Dev\_Proj_BidfGen2\docs\test-vectors\recipe-aliases.json";
 }

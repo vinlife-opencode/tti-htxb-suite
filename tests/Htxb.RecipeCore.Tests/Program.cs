@@ -15,6 +15,8 @@ internal static class Program
           --vectors DIR|FILE   the shared vector file (default: the BidfGen2 copy)
           --samples DIR        the customer delivery (default: the STM 261028 package)
           --tables  DIR        folder with Std_*.xlsx + Cust_Profile_Select (default: fixtures)
+            --zadz    DIR        the machine recipe export (default: live delivery, else fixtures)
+            --zadz    DIR        the machine recipe export (default: live delivery, else fixtures)
           --quiet              print failures only
 
         Exit code 0 = all checks passed, 1 = a check failed.
@@ -27,6 +29,8 @@ internal static class Program
         string vectorsPath = TestPaths.DefaultVectors;
         string samplesRoot = TestPaths.DefaultSamples;
         string tablesRoot = TestPaths.DefaultTables;
+        string zadzRoot = Directory.Exists(TestPaths.DefaultZadz)
+            ? TestPaths.DefaultZadz : TestPaths.FixtureZadz;
         bool quiet = false;
 
         for (int i = 0; i < args.Length; i++)
@@ -36,6 +40,7 @@ internal static class Program
                 case "--vectors" when i + 1 < args.Length: vectorsPath = args[++i]; break;
                 case "--samples" when i + 1 < args.Length: samplesRoot = args[++i]; break;
                 case "--tables" when i + 1 < args.Length: tablesRoot = args[++i]; break;
+                case "--zadz" when i + 1 < args.Length: zadzRoot = args[++i]; break;
                 case "--quiet": quiet = true; break;
                 case "-h" or "--help": Console.WriteLine(Usage); return 0;
                 default:
@@ -64,6 +69,8 @@ internal static class Program
         }
 
         UnitTests.Register(runner, vectors);
+
+        DiffTests.Register(runner, samplesRoot, zadzRoot, TestPaths.DefaultAliases);
 
         bool haveDelivery = Directory.Exists(samplesRoot);
         bool haveTables = Directory.Exists(tablesRoot);

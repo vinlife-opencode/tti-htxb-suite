@@ -1231,3 +1231,28 @@ unlisted recipe and the note *"no table in the folder covers all 14 step(s) - th
 Std_02b_ST_BRF9.xlsx at 9 of 14, so the watcher uses its configured fallback table, not that
 one"*. The change report for this behaviour still has to be written with the next build,
 because the version number comes from build.ps1.
+
+## 2026-10-31 - ecipe-diff ported to C#
+
+| Type | Paths | Summary |
+|---|---|---|
+| created | `src/Htxb.RecipeCore/Model/ZadzStep.cs` | One `AgingProcess` entry: name, Vds, Vgs, and every field verbatim. |
+| created | `src/Htxb.RecipeCore/Model/ZadzRecipe.cs` | The machine recipe (PartName / PartLibrary / Options + steps); `Names` is what the CSV will log. |
+| created | `src/Htxb.RecipeCore/Adapters/ZadzAdapter.cs` | Reads the `.zadz` JSON (UTF-8/BOM, 22 fields with spaces and parentheses, unknown fields kept, a step without a name skipped). |
+| created | `src/Htxb.RecipeCore/Diff/DiffResult.cs` | `DiffPair` and `DiffResult`; `Aligned` is strict - a rename is a difference. |
+| created | `src/Htxb.RecipeCore/Diff/RecipeAligner.cs` | LCS pairing over `TestName.Normalise` keys, alias map applied only to unmatched steps. |
+| created | `src/Htxb.RecipeCore/Diff/RecipeDiffer.cs` | Workbook via `PlanSheetAdapter` vs `.zadz`; compares names and Vds/Vgs only (limits are different quantities on the two sides). |
+| created | `src/Htxb.RecipeCore/Diff/DiffReport.cs` | Text for the operator, JSON as the parity contract with the Python tool. |
+| created | `src/Htxb.RecipeTool/Commands/DiffCommand.cs` | `diff <workbook.xlsx> <recipe.zadz> [--json] [--strict]`. |
+| modified | `src/Htxb.RecipeTool/Program.cs` | Usage and dispatch for `diff`. |
+| created | `tests/Htxb.RecipeCore.Tests/DiffTests.cs` | 6 rule checks + the 16-pair delivery baseline, asserted per recipe. |
+| modified | `tests/Htxb.RecipeCore.Tests/Program.cs`, `TestPaths.cs` | `--zadz`, live-then-fixtures resolution, shared alias-file path. |
+| modified | `test-recipetool.ps1` | Builds the tool as well, passes `--zadz`, and adds the parity phase against the Python tool. |
+| created | `docs/recipe-diff-port.md` | The plan this implements. |
+
+Verified on 2026-10-31: `test-recipetool.ps1` -> `50 passed, 0 failed, 0 skipped` (was 28);
+parity vs the Python tool on the same 16 pairs -> `16 same, 0 different`; BidfGen2
+`dev-check.ps1` -> `25/25` Python, `14/14` C#, `50/50` recipe. Baseline: BR 32 paired
+(25 exact, 7 alias), the five BR recipes carrying `IGSS_-10V_1` / `IGSS_-10V_3` machine-only;
+SQ 15 paired (14 / 1) with `RAMP_DOWN` machine-only. The Python `recipe-diff` stays as the
+reference until a second green parity run, then it is deleted.

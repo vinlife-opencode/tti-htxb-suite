@@ -13,6 +13,8 @@ internal static class Program
           steps   <workbook.xlsx>            dump one plan sheet's steps
           fit     [--samples DIR] [--tables DIR] [--json] [--strict]
                                             judge each recipe against a std table
+            diff    <workbook.xlsx> <recipe.zadz> [--json] [--strict]
+                                              compare a workbook with the machine recipe
 
         Options
           --samples DIR   delivery folder (default: the STM 261028 package)
@@ -48,6 +50,7 @@ internal static class Program
                 "recipes" => RecipesCommand.Run(reader),
                 "steps" => RecipesCommand.Steps(reader),
                 "fit" => FitCommand.Run(reader),
+                "diff" => DiffCommand.Run(reader),
                 _ => throw new UsageException($"Unknown command '{args[0]}'."),
             };
         }

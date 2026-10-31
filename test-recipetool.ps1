@@ -37,6 +37,8 @@ Set-Location $root
 
 $proj = Join-Path $root 'tests\Htxb.RecipeCore.Tests\Htxb.RecipeCore.Tests.csproj'
 $exe  = Join-Path $root 'tests\Htxb.RecipeCore.Tests\bin\Release\net8.0\Htxb.RecipeCore.Tests.exe'
+$toolProj = Join-Path $root 'src\Htxb.RecipeTool\Htxb.RecipeTool.csproj'
+$tool     = Join-Path $root 'src\Htxb.RecipeTool\bin\Release\net8.0\Htxb.RecipeTool.exe'
 
 if (-not (Test-Path -LiteralPath $proj)) { throw "test project not found: $proj" }
 
@@ -65,6 +67,8 @@ if (-not $SkipBuild) {
     Write-Host '== Build test runner (Release) =='
     dotnet build $proj -c Release --nologo
     if ($LASTEXITCODE -ne 0) { throw 'Build failed: Htxb.RecipeCore.Tests' }
+    dotnet build $toolProj -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Build failed: Htxb.RecipeTool' }
     Write-Host ''
 }
 
@@ -72,10 +76,47 @@ if (-not (Test-Path -LiteralPath $exe)) {
     throw "test runner not built: $exe (run without -SkipBuild)"
 }
 
+# The machine recipe export, from the same two sources as the delivery.
+$zadzSub = Join-Path $delivery '2108 Recipe 261031'
+if (-not $Zadz) {
+    $liveZ = Join-Path $bidfgen $zadzSub
+    $pinZ  = Join-Path $bidfgen ('handover\fixtures\' + $zadzSub)
+    if (Test-Path -LiteralPath $liveZ) { $Zadz = $liveZ }
+    elseif (Test-Path -LiteralPath $pinZ) { $Zadz = $pinZ }
+}
+
 $arguments = @()
 if ($Vectors) { $arguments += @('--vectors', $Vectors) }
 if ($Samples) { $arguments += @('--samples', $Samples) }
 if ($Tables)  { $arguments += @('--tables',  $Tables) }
+if ($Zadz)    { $arguments += @('--zadz', $Zadz) }
 
 & $exe @arguments
-exit $LASTEXITCODE
+$code = $LASTEXITCODE
+
+# -- parity with the Python tool (its reference until it is retired) --------
+$py = Get-Command py -ErrorAction SilentlyContinue
+if ($Zadz -and $Samples -and $py -and (Test-Path -LiteralPath $tool) -and (Test-Path -LiteralPath (Join-Path $bidfgen 'bidfgen\cli.py'))) {
+    Write-Host ''
+    Write-Host '== parity: Python recipe-diff vs C# diff =='
+    $same = 0; $different = 0
+    foreach ($f in Get-ChildItem $Zadz -Filter *.zadz | Sort-Object Name) {
+        $book = Get-ChildItem $Samples -Recurse -Filter ($f.BaseName + '.xlsx') | Select-Object -First 1
+        if (-not $book) { continue }
+        Push-Location $bidfgen
+        $pyJson = (& py -3.13 -m bidfgen.cli recipe-diff $book.FullName $f.FullName --json 2>&1 | Out-String)
+        Pop-Location
+        $csJson = (& $tool diff $book.FullName $f.FullName --json 2>&1 | Out-String)
+        try {
+            $a = ($pyJson | ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress)
+            $b = ($csJson | ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress)
+            if ($a -eq $b) { $same++ } else { $different++; Write-Host ('  DIFF ' + $f.BaseName) }
+        } catch { $different++; Write-Host ('  FAIL ' + $f.BaseName + ' (unreadable JSON)') }
+    }
+    Write-Host ('  parity: ' + $same + ' same, ' + $different + ' different')
+    if ($different -gt 0) { $code = 1 }
+} else {
+    Write-Host ''
+    Write-Host 'SKIP  parity: Python tool, C# tool or machine recipes not available'
+}
+exit $code

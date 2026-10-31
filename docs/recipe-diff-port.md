@@ -1,9 +1,14 @@
 # Porting `recipe-diff` to C#
 
+**Status: implemented 2026-10-31.** The C# command reproduces the Python tool on
+all 16 pairs of the 261028 delivery (parity `16 same, 0 different`), and
+`test-recipetool.ps1` runs it as part of the gate (`50 passed`). The Python
+command remains as the reference until a second green parity run, then it is
+deleted (step 7 below).
+
 Plan for moving the workbook ↔ machine-recipe comparison out of the Python tool
 (`bidfgen recipe-diff`, commit `ff5dcbb`) and into `Htxb.RecipeCore` /
-`Htxb.RecipeTool`. Python stays as the reference implementation until parity is
-proven on the full delivery, then the Python command is deleted.
+`Htxb.RecipeTool`.
 
 ## 1. Why
 
@@ -16,8 +21,9 @@ measured expectations, so it is the right first port.
 
 ```
 src/Htxb.RecipeCore/
-  Model/ZadzRecipe.cs        the .zadz JSON model (System.Text.Json, no NuGet)
+  Model/ZadzRecipe.cs        the machine recipe model
   Model/ZadzStep.cs          one AgingProcess entry, 22 fields by JSON name
+  Adapters/ZadzAdapter.cs    reads the .zadz JSON (System.Text.Json, no NuGet)
   Diff/RecipeAligner.cs      LCS pairing + alias map
   Diff/DiffResult.cs         pairs / renamed / one-sided / value differences
   Diff/RecipeDiffer.cs       reads workbook (PlanSheetAdapter) + .zadz, compares
@@ -74,8 +80,8 @@ object so both implementations can be compared structurally.
 
 ## 5. Shared contract — one alias file, both suites
 
-The alias map must not drift. Add `docs/test-vectors/recipe-aliases.json` to
-BidfGen2, asserted by `test_onboard.py` and by the C# suite, the same pattern as
+The alias map must not drift. `docs/test-vectors/recipe-aliases.json` in BidfGen2
+is asserted by `test_onboard.py` and by the C# suite, the same pattern as
 `normalise.json`:
 
 ```json
@@ -94,17 +100,11 @@ BidfGen2, asserted by `test_onboard.py` and by the C# suite, the same pattern as
 }
 ```
 
-Also add the names this delivery exercises (`HTGB`, `HTGB1`, `HTRB6_R`,
-`HTGB_RAMP UP`, `CH RAMP UP  + HTGB`, `IGSS_+20V_1`, `IGSS_-10V_1`) to
-`normalise.json`, so a change to either normaliser fails both suites.
+## 6. Prerequisite: the `.zadz` files must be reachable — done
 
-## 6. Prerequisite: the `.zadz` files must be reachable
-
-The 16 machine recipes (~215 KB) are only in the untracked `Samples\` drop today.
-Pin them under
-`handover\fixtures\samples\TTSZ Zhou Rong 261029 New Recipes\...\2108 Recipe 261031\`
-so a fresh clone and the C# tests can run, exactly as the 17 workbooks were pinned
-in `f91f821`. `test-recipetool.ps1` then resolves them the same way.
+The 16 machine recipes (~208 KB) are pinned under
+`handover\fixtures\samples\TTSZ Zhou Rong 261029 New Recipes\...\2108 Recipe 261031\`,
+byte-identical to the live drop, so a fresh clone and the C# tests can run.
 
 ## 7. Expected baseline (measured with the Python tool, 2026-10-31)
 
@@ -115,7 +115,7 @@ in `f91f821`. `test-recipetool.ps1` then resolves them the same way.
 | all six SQ | 15 | 14 | 1 | `RAMP_DOWN` |
 
 Every recipe reports `RESULT: differences above`; none is aligned. The C# port
-must reproduce this table exactly, including the seven rename pairs and the
+reproduces this table exactly, including the seven rename pairs and the
 `CH RAMP UP  + HTGB` / `HTGB_RAMP UP` → `HTGB_RAMP` pairing.
 
 ## 8. Tests
@@ -126,24 +126,21 @@ SQ ramp spellings.
 
 **Real data (16 pairs):** the table in §7 asserted per recipe, not just in total.
 
-**Parity:** a script that runs both implementations with `--json` over all 16
-pairs and compares the objects; added to `test-recipetool.ps1` as a phase that
-skips visibly when the Python tool or the samples are absent. It becomes the
-retirement proof for the Python command.
+**Parity:** `test-recipetool.ps1` runs both implementations with `--json` over all
+16 pairs and compares the objects; it skips visibly when the Python tool or the
+samples are absent. Result on 2026-10-31: `16 same, 0 different`.
 
 ## 9. Steps
 
-| # | step | output | estimate |
+| # | step | output | state |
 |---|---|---|---|
-| 1 | `ZadzStep` / `ZadzRecipe` + reader | Core model + JSON round-trip test | 2 h |
-| 2 | `RecipeAligner` + alias file | Core + unit tests | 3 h |
-| 3 | `RecipeDiffer`, text/JSON report | Core | 3 h |
-| 4 | `DiffCommand` + usage text | Tool | 1 h |
-| 5 | Pin `.zadz`, add vectors, 16-pair baseline | Tests | 2 h |
-| 6 | Parity script + `test-recipetool.ps1` phase | verification | 2 h |
-| 7 | Docs (`PROJECT_LOG.md`, `docs/std-ingest.md` cross-reference), delete the Python command | docs | 1 h |
-
-Roughly **1.5 working days**, with steps 1–4 independent of the data work.
+| 1 | `ZadzStep` / `ZadzRecipe` + adapter | Core model + reader | done |
+| 2 | `RecipeAligner` + alias file | Core + unit tests | done |
+| 3 | `RecipeDiffer`, text/JSON report | Core | done |
+| 4 | `DiffCommand` + usage text | Tool | done |
+| 5 | Pin `.zadz`, 16-pair baseline | Tests + fixtures | done |
+| 6 | Parity phase in `test-recipetool.ps1` | verification | done |
+| 7 | Delete the Python command after a second green parity run | cleanup | pending |
 
 ## 10. Risks
 
@@ -151,15 +148,15 @@ Roughly **1.5 working days**, with steps 1–4 independent of the data work.
 |---|---|
 | normalisation drifts between the two implementations | shared `normalise.json` vectors, asserted by both |
 | alias map drifts | single `recipe-aliases.json`, asserted by both |
-| number formatting (`930` vs `930.0`) differs | compare parsed doubles, and in `--json` emit raw strings as the Python tool does |
-| `.zadz` is UTF-8 with BOM | `File.ReadAllText` + `JsonSerializerOptions` tolerate it; add a fixture test |
-| a future delivery changes the `.zadz` schema | unknown `AgingProcess` fields are ignored; a missing `Test Name` fails loudly |
+| number formatting (`930` vs `930.0`) differs | compare parsed doubles; `--json` carries the raw strings |
+| `.zadz` is UTF-8 with BOM | `File.ReadAllText` drops it; covered by the delivery checks |
+| a future delivery changes the `.zadz` schema | unknown fields are kept, a missing `Test Name` fails loudly |
 
 ## 11. Done criteria
 
-- `Htxb.RecipeTool diff` reproduces the §7 table for all 16 pairs.
-- C# suite: the six unit checks plus 16 real-data checks, all green in
-  `test-recipetool.ps1`.
-- Parity script green against the Python tool on the same 16 pairs.
+- `Htxb.RecipeTool diff` reproduces the §7 table for all 16 pairs. **Met.**
+- C# suite: six unit checks plus 16 delivery checks, green in
+  `test-recipetool.ps1`. **Met** (`50 passed`).
+- Parity green against the Python tool on the same 16 pairs. **Met** (16/16).
 - The Python `recipe-diff` command is deleted in a separate commit after two green
-  runs, with `docs/std-ingest.md` pointing at the C# command instead.
+  parity runs, with `docs/std-ingest.md` pointing at the C# command. **Pending.**
