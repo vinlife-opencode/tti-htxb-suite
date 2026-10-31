@@ -20,6 +20,7 @@ internal static class DiffTests
     [
         new("P_TM_BR9M_B_05_4_32", 32, 32, 25, 7, []),
         new("P_TM_BRF5_B_07_4_32", 32, 34, 25, 7, ["IGSS_-10V_1", "IGSS_-10V_3"]),
+        new("P_TM_BRF7_B_07_4_32", 32, 34, 25, 7, ["IGSS_-10V_1", "IGSS_-10V_3"]),
         new("P_TM_BRF9_B_05_4_32", 32, 34, 25, 7, ["IGSS_-10V_1", "IGSS_-10V_3"]),
         new("P_TM_BRFC_B_05_4_32", 32, 34, 25, 7, ["IGSS_-10V_1", "IGSS_-10V_3"]),
         new("P_TM_BRI9_B_07_4_32", 32, 34, 25, 7, ["IGSS_-10V_1", "IGSS_-10V_3"]),
