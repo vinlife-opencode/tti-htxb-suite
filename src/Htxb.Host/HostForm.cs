@@ -25,6 +25,10 @@ public class HostForm : Form
     private LoadingBar? _loadingBar;
     private System.Windows.Forms.Timer? _loadingTimer;
 
+    // ---- Oversize-width trim (HostOptions.ShrinkOversizeWidth)
+    private const double OversizeShare = 0.25;   // trim above 25% of working-area width
+    private const double OversizeTrim = 0.40;    // remove 40% of the width when trimming
+
     // ---- Edge auto-hide: collapse to a corner tab (opt-in via HostOptions.EnableEdgeAutoHide)
     private const int EdgeTabWidth = 170;     // collapsed tab size, pinned at the corner
     private const int EdgeTabHeight = 72;
@@ -65,6 +69,34 @@ public class HostForm : Form
 
     private bool AutoHideBlocked => PageBusy || AutoHideSuppress != 0;
 
+    /// <summary>
+    /// Drop the window width by <see cref="OversizeTrim"/> when the form would
+    /// otherwise cover more than <see cref="OversizeShare"/> of the primary
+    /// screen's working-area width. Height is deliberately left alone, so the
+    /// window keeps its full vertical extent and only gets narrower.
+    /// The minimum width is reduced first: WinForms clamps <see cref="Form.Size"/>
+    /// straight back up to <see cref="Form.MinimumSize"/>, which would silently
+    /// cancel the trim on every tool that keeps the default 960 px minimum.
+    /// </summary>
+    private void TrimOversizeWidth()
+    {
+        int areaWidth = Screen.PrimaryScreen?.WorkingArea.Width ?? 0;
+        if (areaWidth <= 0)
+            return;
+
+        if (Width <= areaWidth * OversizeShare)
+            return;
+
+        int trimmed = (int)Math.Round(Width * (1.0 - OversizeTrim));
+        if (trimmed < 1 || trimmed == Width)
+            return;
+
+        if (MinimumSize.Width > trimmed)
+            MinimumSize = new Size(trimmed, MinimumSize.Height);
+
+        Size = new Size(trimmed, Height);
+    }
+
     public HostForm(HostOptions options)
     {
         Options = options ?? throw new ArgumentNullException(nameof(options));
@@ -77,6 +109,8 @@ public class HostForm : Form
         Text = options.WindowTitle;
         Size = options.WindowSize ?? new Size(1280, 900);
         MinimumSize = options.MinWindowSize ?? new Size(960, 640);
+        if (options.ShrinkOversizeWidth)
+            TrimOversizeWidth();
         if (options.StartAtScreenTopLeft)
         {
             StartPosition = FormStartPosition.Manual;

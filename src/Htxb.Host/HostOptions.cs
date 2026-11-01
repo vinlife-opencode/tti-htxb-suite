@@ -35,6 +35,14 @@ public sealed class HostOptions
     public bool StartAtScreenTopLeft { get; init; }
 
     /// <summary>
+    /// Cut the window width when it would cover more than a quarter of the
+    /// primary screen's working-area width (see <see cref="HostForm"/>); height
+    /// is never changed. On by default for tool windows; launcher-style windows
+    /// that intentionally sit in a narrow corner strip turn it off.
+    /// </summary>
+    public bool ShrinkOversizeWidth { get; init; } = true;
+
+    /// <summary>
     /// Collapse the window into a small tab pinned at the top-left corner
     /// once loading completes (mouse-out dwell; focus not required);
     /// hovering/clicking the tab or activating the window expands it back

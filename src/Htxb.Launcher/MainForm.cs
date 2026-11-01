@@ -14,6 +14,10 @@ public sealed class MainForm : HostForm
             WindowSize = new System.Drawing.Size(460, FullWorkingAreaHeight()),
             MinWindowSize = new System.Drawing.Size(380, 300),
             StartAtScreenTopLeft = true,
+            // Keep the 460 px corner strip even on small screens: the launcher is
+            // wide on purpose (cards + edge tab), so the oversize-width trim that
+            // applies to tool windows must not touch it.
+            ShrinkOversizeWidth = false,
             // Collapse to a corner tab after load; hovering/clicking the tab
             // expands back to full height.
             EnableEdgeAutoHide = true,

@@ -1422,3 +1422,71 @@ Installed 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities`:
 | modified | `src/Htxb.RecipeCore/History/LotScanner.cs` | The two notes about `config.toml` disagreeing with the report are gone. The site id is still resolved the same way (our RPT first, then another lot's report, then the config), but the note column is for what is wrong with *that lot* - a drifted site setting is not lot information and it filled the column on every row. |
 
 Measured: the 21 reports in `4_Log_Processed_History` regenerated, `note` empty on all of them, site `TTSZ-2101` on all, and no file mentions the local id.
+## 2026-11-01 - P2 Data Analysis locked, Barcode card moved to 4th - launcher V6.11.012
+
+Launcher (V6.11.012, `6.11.12.0`):
+
+* **P2 Data Analysis** joins the restricted set, so four cards now start **compressed**
+  (one-line bar, lock glyph, dashed border) and open only after the admin passphrase:
+  Lot Extractor, Recipe Translator, Recipe-to-Std Table and P2 Data Analysis.
+* **Barcode Generator** card is now **4th** in the grid, directly under the P2 pair. A
+  `DOMContentLoaded` listener registered after the two card builders places it explicitly,
+  so the order no longer depends on injection order.
+
+Resulting grid: Temp Uniformity, BiDF Analysis, P2 Data Analysis - Time, Barcode Generator,
+Lot Extractor, Recipe Translator, Recipe-to-Std Table, P2 Data Analysis.
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.Launcher/Resources/polyfill.js` | `'TTI HTXB_P2 Data Analysis.html'` added to `RESTRICTED`; final ordering listener puts `#tti-barcode-card` at index 3. |
+| modified | `src/Htxb.Launcher/Htxb.Launcher.csproj` | `Version` + `FileVersion` -> `6.11.12.0`. |
+| modified | `.data2/manifest.json` | `launcher` -> `6.11.12.0`. |
+| modified | `build-installer.ps1` | Uninstall detection keyed on the AppId registry key (`{B1C7A4E2-...}_is1`) instead of the display name, which carries the version and never matched; every suite EXE is stopped before the uninstall/move (the resident launcher's locked EXE blocked `Move-Item` and killed the previous run silently); the move failure now says what to do; the verify step fails when the installed launcher version is not the one just built. |
+
+Installed 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities`:
+
+* `installer\out\TTI_Utilities_Setup_V6.11.012.exe` (3.5 MB), uninstall-then-install, registered
+  as "TTI Tools & Utilities V6.11.012";
+* launcher verified at `6.11.12.0` and the installed EXE contains the new card order and the P2
+  lock (`tti-barcode-card`, `TTI HTXB_P2 Data Analysis.html`, `tti-restricted`);
+* the V6.11.011 uninstaller left only `configuration\pc_info.ini` (regenerated on first run), so
+  that folder was moved aside to `_TTI_Utilities.bak-20261101-161718` rather than deleted.
+
+## 2026-11-01 - print/PDF: the two side-by-side charts now print full page width - P2 Data Analysis - Time V6.11.012
+
+Request: "Preset vs actual - per test step" and "Trend - Sigma actual per slot, A vs B" printed
+half page wide (left half of the sheet, right half empty) and must be horizontally full page.
+
+Cause: both chart cards sit in a `.grid-2`. The page's print stylesheet already stacks that grid
+into one column (`.grid-2 { grid-template-columns: 1fr }`), but a Chart.js canvas ignores it - it
+keeps the pixel size it measured in the half-width screen column, so the graph printed at half the
+sheet width.
+
+Fix (polyfill, canonical page untouched - not that it applies here, this page is EXE-only):
+
+* on `beforeprint`, every live chart in `window.charts` is stopped, redrawn at 720 CSS px (an
+  A4/Letter portrait body) at 3x device pixels, snapshotted with `toBase64Image()` and the bitmap
+  inserted as an `<img class="tti-print-chart">` next to the canvas;
+* print-only CSS gives that image `width:100%`, hides the canvas and lets the image set the height
+  (`height:auto`), so the chart fills whatever page width the printer uses;
+* `afterprint` (and the `print` media-query change) removes the images and resizes the live charts
+  back, so the on-screen view is unchanged.
+
+Two things were measured, not assumed, in the app's bundled Chart.js 4.4.1 (probe page against the
+real page's CSS): `chart.resize()` is a no-op while an animation is running - it only stores the
+size for the next frame - hence `chart.stop()` first; and a 457 px wide canvas snapshots at
+2160x888 (3x), printing at ~290 dpi on a 698 px sheet.
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.P2DataAnalysisTime/Resources/polyfill.js` | Part D: `printChartStyle` + `snapshotChartsForPrint` + `restoreChartsAfterPrint` + `hookPrintCharts`; `EXE_VERSION` -> `V6.11.012` (the badge had drifted to `V6.10.302`). |
+| modified | `src/Htxb.P2DataAnalysisTime/Htxb.P2DataAnalysisTime.csproj` | `Version` + `FileVersion` -> `6.11.12.0`. |
+| modified | `.data2/manifest.json` | `p2-analysis-time` -> `6.11.12.0`. |
+
+Note: Temp Uniformity already does this in its own page (`canvas { display:none }` + a print
+image), so only this tool was missing the treatment.
+Reinstalled 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities` with
+`installer\out\TTI_Utilities_Setup_V6.11.012.exe` (uninstall, then install; registered as
+"TTI Tools & Utilities V6.11.012"). `TTI_P2DataAnalysisTime.exe` verified at `6.11.12.0` and the
+installed binary carries the new `tti-print-chart` / `snapshotChartsForPrint` code. The other eight
+EXEs stay at `6.11.11.0` - only this tool's behaviour changed.

@@ -8,8 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Htxb.RecipeTranslator</RootNamespace>
     <AssemblyName>Htxb.RecipeTranslator</AssemblyName>
-    <Version>6.10.151.0</Version>
-    <FileVersion>6.10.151.0</FileVersion>
+    <Version>6.11.11.0</Version>
+    <FileVersion>6.11.11.0</FileVersion>
     <ApplicationIcon>Resources\Favicon.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
   </PropertyGroup>

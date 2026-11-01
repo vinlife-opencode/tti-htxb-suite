@@ -8,8 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Htxb.TempUniformity</RootNamespace>
     <AssemblyName>Htxb.TempUniformity</AssemblyName>
-    <Version>6.10.92.0</Version>
-    <FileVersion>6.10.92.0</FileVersion>
+    <Version>6.11.11.0</Version>
+    <FileVersion>6.11.11.0</FileVersion>
     <ApplicationIcon>Resources\Favicon.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
   </PropertyGroup>

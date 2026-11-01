@@ -8,8 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Htxb.RcpStdTable</RootNamespace>
     <AssemblyName>Htxb.RcpStdTable</AssemblyName>
-    <Version>6.10.91.0</Version>
-    <FileVersion>6.10.91.0</FileVersion>
+    <Version>6.11.11.0</Version>
+    <FileVersion>6.11.11.0</FileVersion>
     <ApplicationIcon>Resources\Favicon.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
   </PropertyGroup>
