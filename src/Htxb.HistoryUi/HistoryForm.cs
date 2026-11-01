@@ -26,6 +26,7 @@ internal sealed class HistoryForm : Form
     private readonly DataGridView _grid = new();
     private readonly Label _summary = new() { AutoSize = true, Padding = new Padding(6, 6, 0, 0) };
     private readonly Button _recover = new() { Text = "Recover selected", AutoSize = true, Enabled = false };
+    private readonly Button _openReport = new() { Text = "Open report", AutoSize = true };
 
     private List<LotHistory> _lots = [];
 
@@ -37,9 +38,14 @@ internal sealed class HistoryForm : Form
 
         Text = "Lots not in the profile list - TTI Post Data Processor";
         Width = 1180;
-        Height = 560;
+        Height = 600;
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(820, 320);
+        MinimumSize = new Size(820, 360);
+
+        // The TTI logo, embedded in the exe: the same file the tray icon and the
+        // desktop shortcut use.
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+        catch (Exception) { /* no icon is not a reason to fail the window */ }
 
         _from.Value = DateTime.Today.AddDays(-14);
         _to.Value = DateTime.Today.AddDays(1);
@@ -51,6 +57,7 @@ internal sealed class HistoryForm : Form
         open.Click += (_, _) => OpenFolder(_history);
 
         _recover.Click += (_, _) => RecoverTicked();
+        _openReport.Click += (_, _) => OpenReport();
 
         var top = new FlowLayoutPanel
         {
@@ -63,14 +70,47 @@ internal sealed class HistoryForm : Form
         [
             new Label { Text = "From", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _from,
             new Label { Text = "to", AutoSize = true, Padding = new Padding(8, 6, 0, 0) }, _to,
-            scan, _recover, open, _summary,
+            scan, _recover, _openReport, open, _summary,
         ]);
 
         BuildGrid();
         Controls.Add(_grid);
+        Controls.Add(Legend());
         Controls.Add(top);
 
         Shown += (_, _) => Scan();
+    }
+
+    /// <summary>
+    /// The colour legend, at the bottom, because a colour with no key is decoration.
+    /// The three tones are the three things the watcher did with a lot.
+    /// </summary>
+    private static Control Legend()
+    {
+        var legend = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            AutoSize = true,
+            Padding = new Padding(8, 4, 8, 6),
+            WrapContents = false,
+            BackColor = SystemColors.Control,
+        };
+
+        legend.Controls.Add(Swatch(Converted, "converted - BiDF + slot summaries"));
+        legend.Controls.Add(Swatch(ReportOnly, "no BiDF - the recipe was not in the profile list; recoverable"));
+        legend.Controls.Add(Swatch(Stopped, "manual stop - the watcher only converts Completed lots"));
+        return legend;
+
+        static Control Swatch(Color colour, string text)
+        {
+            var box = new Panel { Width = 14, Height = 14, BackColor = colour,
+                                  BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(8, 5, 4, 0) };
+            var label = new Label { Text = text, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
+            var pair = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+            pair.Controls.Add(box);
+            pair.Controls.Add(label);
+            return pair;
+        }
     }
 
     private void BuildGrid()
@@ -85,6 +125,7 @@ internal sealed class HistoryForm : Form
         _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         _grid.BackgroundColor = SystemColors.Window;
         _grid.CellValueChanged += (_, e) => { if (e.RowIndex >= 0) UpdateRecoverButton(); };
+        _grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenReport(); };
         _grid.CurrentCellDirtyStateChanged += (_, _) =>
         {
             if (_grid.IsCurrentCellDirty) _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
@@ -254,6 +295,36 @@ internal sealed class HistoryForm : Form
             MessageBoxButtons.OK, failed.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
 
         Scan();
+    }
+
+    /// <summary>
+    /// Write this lot's report and open it - the same one-row CSV `history report`
+    /// writes, so what you read here is what the folder holds. Re-scanning a lot
+    /// refreshes its own file and nothing else.
+    /// </summary>
+    private void OpenReport()
+    {
+        if (_grid.CurrentRow?.Tag is not LotHistory lot)
+        {
+            MessageBox.Show(this, "Select a row first.", "Open report",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            string path = LotReportWriter.Write(lot, _history);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show(this, error.Message, "Open report",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void OpenFolder(string path)

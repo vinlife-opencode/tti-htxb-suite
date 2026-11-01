@@ -8,9 +8,14 @@
     <RootNamespace>Htxb.HistoryUi</RootNamespace>
     <AssemblyName>Htxb.HistoryUi</AssemblyName>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Resources\tti.ico</ApplicationIcon>
     <Version>1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Htxb.RecipeCore\Htxb.RecipeCore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The TTI logo, the same file the tray and the desktop shortcut use. -->
+    <None Include="Resources\tti.ico" />
   </ItemGroup>
 </Project>
