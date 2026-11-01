@@ -34,6 +34,15 @@ internal static class TestPaths
     public const string DefaultAliases =
         @"D:\_TTI-Dev\_Proj_BidfGen2\docs\test-vectors\recipe-aliases.json";
 
+    /// <summary>Where the watcher puts a lot it has processed.</summary>
+    public const string ProcessedLots = @"D:\COBIS-II-632\COBIS-II\1_Log_Final";
+
+    /// <summary>Where the watcher archives the raw CSVs of a lot.</summary>
+    public const string ArchivedLots = @"D:\COBIS-II-632\COBIS-II\3_Log Archive";
+
+    /// <summary>The installed configuration: the site id the history report prints.</summary>
+    public const string InstalledConfig = @"C:\TTI_PostDataProcessor\config.toml";
+
     /// <summary>
     /// The tables and profile CSV the site actually runs with. Preferred over the
     /// tracked fixture when it is on this machine, because it is the configuration

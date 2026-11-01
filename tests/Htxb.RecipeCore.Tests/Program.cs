@@ -75,6 +75,8 @@ internal static class Program
 
         ToolTests.Register(runner, samplesRoot, zadzRoot, tablesRoot);
 
+        HistoryTests.Register(runner, tablesRoot);
+
         bool haveDelivery = Directory.Exists(samplesRoot);
         bool haveTables = Directory.Exists(tablesRoot);
 

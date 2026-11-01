@@ -1327,3 +1327,30 @@ Re-measured: `Htxb.RecipeTool std-ingest P_TM_BRJJ_B_09_4_32.xlsx --names-from
 `HTGB_HT7_R`, `HTRB8_R`, `HTGB_HT8_R`); the same command with the BRF9 workbook
 against a BRF9 log is still refused (34 vs 32). `test-recipetool.ps1` ->
 `86 passed, 0 failed, 0 skipped`.
+## 2026-11-01 - history report: one lot per process, one CSV per lot
+
+Stage 1 of the "recover lots whose recipe was not in the profile list" sub-project.
+Reads the site's two folders and writes one report file per lot; it changes nothing.
+
+| Type | Paths | Summary |
+|---|---|---|
+| created | `src/Htxb.RecipeCore/History/LotScanner.cs` | Resolves a lot from either side of the pair, matches `<14 digits><2 letters>_<14 digits>` (+ `_CSV`, + duplicate " 2"), reads the slot headers, counts slots and statuses, resolves the recipe against the profile CSV, and decides `state`. |
+| created | `src/Htxb.RecipeCore/History/LotReportWriter.cs` | The one-row CSV, `<stamp>_<site>_<lot>.csv`, quoting only when needed. |
+| modified | `src/Htxb.RecipeCore/Ingest/SlotCsvReader.cs` | `ReadSlotHeader` - the tester's `System Information` row (machine, position, lot, start, status). |
+| created | `src/Htxb.RecipeTool/Commands/HistoryCommand.cs` | `history report --lot <folder> [--out DIR]`; exit 0 written, 1 unreadable lot, 2 usage. |
+| modified | `src/Htxb.RecipeTool/{Program,ToolPaths}.cs` | Dispatch and the site folder defaults. |
+| created | `tests/Htxb.RecipeCore.Tests/HistoryTests.cs` | 11 checks: the folder pattern, all four states, the duplicate folder, the six-hour stale tolerance, the writer, a refused non-lot, and the real 22 archive folders. |
+
+Two things the first run taught:
+
+* the site id in the file name must be the one **our own report wrote** (read from a slot
+  RPT), not `[plant] machine_id`: the installed config now says `TTI-0001` while every RPT
+  says `TTSZ-2101`, and the config value also drives the vendor `SystemConfig1.xml`, so it
+  was not changed here. The disagreement is written into the row's `note`;
+* a copy of the whole tree gives the two sides creation times seconds apart in either
+  order, so "stale" needs a tolerance - six hours - or every lot looks stale.
+
+Measured on the site: 22 archive folders -> 21 report files (one duplicate folder), **9 full,
+9 report-only, 3 not processed**. The nine report-only lots are the recovery list: BRJJ x6 and
+SQFJ x3, every one Completed, whose recipes are rows 15 and 17 of the current CSV.
+`test-recipetool.ps1` -> 98 passed, 0 failed, 0 skipped (was 87).

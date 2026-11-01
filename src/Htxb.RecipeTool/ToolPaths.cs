@@ -26,4 +26,16 @@ internal static class ToolPaths
     /// at a lot this machine processed.
     /// </summary>
     public const string InstalledTables = @"C:\TTI_PostDataProcessor\Configuration\Recipe_Std_Table";
+
+    /// <summary>The installed configuration: the site id the history report prints.</summary>
+    public const string InstalledConfig = @"C:\TTI_PostDataProcessor\config.toml";
+
+    /// <summary>Where the watcher puts a lot it has processed.</summary>
+    public const string ProcessedLots = @"D:\COBIS-II-632\COBIS-II\1_Log_Final";
+
+    /// <summary>Where the watcher archives the raw CSVs of a lot.</summary>
+    public const string ArchivedLots = @"D:\COBIS-II-632\COBIS-II\3_Log Archive";
+
+    /// <summary>The history reports: one CSV per lot, created when missing.</summary>
+    public const string HistoryReports = @"D:\COBIS-II-632\COBIS-II\4_Log_Processed_History";
 }

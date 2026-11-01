@@ -36,6 +36,54 @@ public static class SlotCsvReader
         "datatransfer", "rampdown", "totstresstime", "totbitime",
     };
 
+    /// <summary>The tester's own <c>System Information</c> row for one slot log.</summary>
+    public sealed record SlotHeader(
+        string MachineId, string MachineType, string Position, string LotNumber,
+        string StartTime, string BoardId, string Status)
+    {
+        /// <summary>The slot number from <c>Position</c> ("SLOT 11" → 11), 0 when unreadable.</summary>
+        public int Slot => System.Text.RegularExpressions.Regex.Match(Position ?? "", @"(\d+)") is
+            { Success: true } m && int.TryParse(m.Groups[1].Value, out int n) ? n : 0;
+    }
+
+    /// <summary>
+    /// The <c>System Information</c> block of a slot log: banner row, header row,
+    /// one value row. This is what says which machine ran the log, which lot it is
+    /// and whether the run finished or was stopped by hand.
+    /// </summary>
+    public static SlotHeader ReadSlotHeader(string path)
+    {
+        if (!File.Exists(path)) throw new FileNotFoundException("slot log not found", path);
+
+        List<List<string>> rows = ReadRows(path);
+
+        int banner = -1;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (rows[i].Count > 0 && rows[i][0].Trim() == "System Information" && IsBlank(rows[i], 1))
+            {
+                banner = i;
+                break;
+            }
+        }
+
+        if (banner < 0 || banner + 2 >= rows.Count)
+            throw new InvalidDataException($"{Path.GetFileName(path)} has no readable 'System Information' block.");
+
+        List<string> header = rows[banner + 1].Select(c => c.Trim()).ToList();
+        List<string> values = rows[banner + 2];
+
+        string Get(string name)
+        {
+            int column = header.FindIndex(h => string.Equals(h, name, StringComparison.OrdinalIgnoreCase));
+            return column >= 0 && column < values.Count ? values[column].Trim() : string.Empty;
+        }
+
+        return new SlotHeader(
+            Get("Machine ID"), Get("Machine Type"), Get("Position"), Get("Lot Number"),
+            Get("Start Time"), Get("Board ID"), Get("Status"));
+    }
+
     /// <summary>
     /// The step names the slot ran, in the order they first appear.
     ///

@@ -22,6 +22,8 @@ internal static class Program
                                             write the per-recipe table the machine runs
           validate-lot <lot> [--table Std_NN.xlsx] [--tables DIR] [--json]
                                             check a processed lot against its table
+          history report --lot <folder> [--out DIR]
+                                            one lot of the processed history -> one CSV
 
         Options
           --samples DIR   delivery folder (default: the STM 261028 package)
@@ -62,6 +64,7 @@ internal static class Program
                 "std-ingest" => StdIngestCommand.Run(reader),
                 "std-align" => StdAlignCommand.Run(reader),
                 "validate-lot" => ValidateLotCommand.Run(reader),
+                "history" => HistoryCommand.Run(reader),
                 _ => throw new UsageException($"Unknown command '{args[0]}'."),
             };
         }
