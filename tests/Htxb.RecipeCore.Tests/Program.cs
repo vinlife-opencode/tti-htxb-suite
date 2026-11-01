@@ -72,6 +72,8 @@ internal static class Program
 
         DiffTests.Register(runner, samplesRoot, zadzRoot, TestPaths.DefaultAliases);
 
+        ToolTests.Register(runner, samplesRoot, zadzRoot, tablesRoot);
+
         bool haveDelivery = Directory.Exists(samplesRoot);
         bool haveTables = Directory.Exists(tablesRoot);
 

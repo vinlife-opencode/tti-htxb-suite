@@ -16,9 +16,17 @@ internal static class Program
             diff    <workbook.xlsx> <recipe.zadz> [--json] [--strict]
                                               compare a workbook with the machine recipe
 
+          std-ingest <workbook.xlsx> -o <Std_NN.xlsx> [--sheet NAME] [--names-from LOT]
+                                            write a limits table from a workbook
+          std-align  <workbook.xlsx> --zadz <recipe.zadz> -o <Std_NN.xlsx> [--aliases FILE]
+                                            write the per-recipe table the machine runs
+          validate-lot <lot> [--table Std_NN.xlsx] [--tables DIR] [--json]
+                                            check a processed lot against its table
+
         Options
           --samples DIR   delivery folder (default: the STM 261028 package)
-          --tables  DIR   folder holding Std_*.xlsx (default: BidfGen2 fixtures)
+          --tables  DIR   folder holding Std_*.xlsx + Cust_Profile_Select
+                          (default: the installed configuration, else the fixtures)
           --json          machine-readable output
           --strict        non-zero exit unless every recipe FITS
 
@@ -51,6 +59,9 @@ internal static class Program
                 "steps" => RecipesCommand.Steps(reader),
                 "fit" => FitCommand.Run(reader),
                 "diff" => DiffCommand.Run(reader),
+                "std-ingest" => StdIngestCommand.Run(reader),
+                "std-align" => StdAlignCommand.Run(reader),
+                "validate-lot" => ValidateLotCommand.Run(reader),
                 _ => throw new UsageException($"Unknown command '{args[0]}'."),
             };
         }

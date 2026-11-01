@@ -33,4 +33,11 @@ internal static class TestPaths
     /// <summary>The alias map shared with the Python tool, asserted by both suites.</summary>
     public const string DefaultAliases =
         @"D:\_TTI-Dev\_Proj_BidfGen2\docs\test-vectors\recipe-aliases.json";
+
+    /// <summary>
+    /// The tables and profile CSV the site actually runs with. The tools are checked
+    /// against these because they are what the Python tools produced, so a difference
+    /// here is a regression; the tracked fixture is the fallback for a fresh clone.
+    /// </summary>
+    public const string InstalledTables = @"C:\TTI_PostDataProcessor\Configuration\Recipe_Std_Table";
 }

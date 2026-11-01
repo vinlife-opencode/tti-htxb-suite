@@ -1,4 +1,4 @@
-﻿# PROJECT_LOG.md â€” TTI HTXB Suite (Phase 2) Change History
+# PROJECT_LOG.md â€” TTI HTXB Suite (Phase 2) Change History
 
 Project rule (per AGENTS.md): **every** create / modify / delete of a file or folder under this
 repo MUST be appended here, in the same session it happened, before the session ends.
@@ -1266,3 +1266,44 @@ reference until a second green parity run, then it is deleted.
 The Python command itself was deleted in BidfGen2 (`bidfgen/tools/recipe_diff.py`, its
 `cli.py` dispatch, its checks in `test_onboard.py`). One implementation again.
 `docs/std-ingest.md` there points at `Htxb.RecipeTool diff`.
+## 2026-11-01 - std-ingest, std-align and validate-lot ported to C#
+
+BidfGen2 `AGENTS.md` rule 14 now says new code is C#; `bidfgen\` stays the frozen
+Python product. The three hand-run table tools moved here, and their Python CLIs
+were deleted.
+
+| Type | Paths | Summary |
+|---|---|---|
+| created | `src/Htxb.RecipeCore/Xlsx/XlsxWriter.cs` | Package-free xlsx writer: zip of the minimum OpenXML parts, inline strings, numbers stay numbers (`15sec` stays text). |
+| created | `src/Htxb.RecipeCore/Bidf/BidfReader.cs` | Read-only BiDF access through the in-box `winsqlite3.dll`. Strings cross as `IntPtr` - a `char*` declared as `byte[]` corrupts the heap on the first call. |
+| created | `src/Htxb.RecipeCore/Ingest/StdTableBuilder.cs` | `BuildFromWorkbook`, `BuildAligned`, `BuildWithoutMachine`, `ApplyLoggedNames`, `NormaliseLimits`; machine-only rows defined here (`IGSS_-10V_1/_3`, ±80 nA, bins `15F`/`173`). |
+| created | `src/Htxb.RecipeCore/Ingest/StdTableWriter.cs` | The `std_table` sheet, 16 or 17 columns. |
+| created | `src/Htxb.RecipeCore/Ingest/SlotCsvReader.cs` | Test names from a slot log's `Test Data` block; quoted fields and line breaks handled. |
+| created | `src/Htxb.RecipeCore/Model/StdLimits.cs` | `lsl`/`usl` exactly as `bidfgen.stdtable._derive_limits` derives them. |
+| created | `src/Htxb.RecipeCore/Validate/LotValidator.cs` | Per-slot validation: names from `tbl_testflow.note` (raw and normalised), limits, bins, counts, drift, DUT/package, slot-summary legend, slot-log names. |
+| created | `src/Htxb.RecipeTool/Commands/{StdIngest,StdAlign,ValidateLot}Command.cs` | `std-ingest`, `std-align`, `validate-lot`. |
+| created | `tests/Htxb.RecipeCore.Tests/ToolTests.cs` | 5 writer/limit checks, 17 parity checks, 10 validate-lot checks. |
+| modified | `Model/TestName.cs` | `Base()` - the re-issue guard (`HTGB1` == `HTGB` == `HTGB_R`). |
+| modified | `Adapters/PlanSheetAdapter.cs` | `Remarks` also accepts `remark` (the SQ variant). |
+| modified | `RecipeTool/ArgReader.cs`, `Program.cs`, `ToolPaths.cs` | Single-dash options (`-o`), the three commands, the installed tables folder. |
+
+Measured on 2026-11-01:
+
+- **std-align parity.** All 17 shipped tables regenerated from the same workbook and
+  `.zadz`: 7536 cells compared, **43 differing**, every one of them `V_gs` - and all
+  of them the same case: Python wrote `str(cell("vgs") or "").strip()`, and `0` is
+  falsy in Python, so a step applying exactly 0 V lost its value. The C# tool keeps
+  `"0"`. Name, limits, units, HW/SW bins, timing, exclusion and remarks match cell
+  for cell, including the variant-B SQGW table.
+- **validate-lot.** The 9 lots of `2108 post log files`: 8 × 292 checks and 1
+  single-slot lot × 16 checks, **0 failed**. The same run on `2108 log files 1`
+  fails the four lots it processed - the slot summary still advertises the
+  `Std_02b` bins (`706/731/537/756`, `102/132/122`) and the DUT is the old
+  `SCT40W120G34AG` - and exits 2 for the five it never touched.
+- **Checks.** `test-recipetool.ps1` -> `83 passed, 0 failed, 0 skipped` (was 51).
+  BidfGen2 `dev-check.ps1` -> `25/25` Python suites, `14/14` C#, `83/83` recipe.
+
+Three defects found in the Python tools while porting, all fixed by the port:
+the single-`.bidf` read (a lot has 24), the name taken through `test_id` instead of
+`note` (which hides a `_1`/`_3` swap), and the per-bin count that grouped by
+`(hwbin, hwbin_desc, swbin)` and kept one row per bin.

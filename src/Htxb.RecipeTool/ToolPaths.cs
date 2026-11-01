@@ -19,4 +19,11 @@ internal static class ToolPaths
     /// </summary>
     public const string DefaultTables =
         @"D:\_TTI-Dev\_Proj_BidfGen2\handover\fixtures\deploy-config\Recipe_Std_Table";
+
+    /// <summary>
+    /// The tables the site actually runs with, plus the profile CSV that names the
+    /// table per recipe. Preferred by <c>validate-lot</c>, which is normally pointed
+    /// at a lot this machine processed.
+    /// </summary>
+    public const string InstalledTables = @"C:\TTI_PostDataProcessor\Configuration\Recipe_Std_Table";
 }

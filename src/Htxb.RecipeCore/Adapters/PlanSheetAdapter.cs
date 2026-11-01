@@ -223,7 +223,7 @@ public static class PlanSheetAdapter
             HwBin = Field(fields, "hwbin"),
             SwBinPriority = Field(fields, "swbinpriority"),
             ExcludeWhenFail = Field(fields, "excludewhenfail"),
-            Remarks = Field(fields, "remarks"),
+            Remarks = Field(fields, "remarks", "remark"),
             Fields = fields,
         };
     }

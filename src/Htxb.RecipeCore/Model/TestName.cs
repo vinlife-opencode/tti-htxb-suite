@@ -37,6 +37,25 @@ public static class TestName
     public static bool Equivalent(string? a, string? b) =>
         Normalise(a).Length > 0 && Normalise(a) == Normalise(b);
 
+    private static readonly Regex TrailingReissue = new(@"[_ ]r$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex TrailingDigits = new(@"\d+$", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// A name with the re-issue decorations removed, so <c>HTGB1</c>, <c>HTGB</c>
+    /// and <c>HTGB_R</c> share one base.
+    ///
+    /// Mirrors <c>bidfgen.tools.std_ingest._base</c>: a re-issued recipe renames
+    /// steps without changing the plan (<c>HTRB6_R</c> becomes <c>HTRB6</c>,
+    /// <c>IGSS_20V_1</c> becomes <c>IGSS_+20V_1</c>), and the pairing of workbook
+    /// row to logged name is positional - so this is a guard against pairing the
+    /// wrong two rows, never a lookup key.
+    /// </summary>
+    public static string Base(string? name)
+    {
+        string plain = TrailingReissue.Replace((name ?? string.Empty).Trim(), string.Empty);
+        return TrailingDigits.Replace(Normalise(plain), string.Empty);
+    }
+
     /// <summary>
     /// The <c>HEX'=F_NAME</c> pair the customer writes in <c>SW BIN Priority</c> -
     /// hex bin code plus the slot-summary legend label.
