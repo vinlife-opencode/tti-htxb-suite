@@ -13,8 +13,9 @@
 ; background), and the uninstaller removes the program files because this suite
 ; keeps no site data of its own apart from configuration\ and data2\assets\dut_package.
 
-; Version shown in "Apps & features" - injected by build-installer.ps1 from
-; .data2\manifest.json (launcher tool id), so it always matches the cover page.
+; Version shown in "Apps & features" - injected by build-installer.ps1 as the
+; NEWEST tool version in .data2\manifest.json (each EXE keeps its own version,
+; so the suite number is the highest one it contains).
 #ifndef AppVer
   #define AppVer "V0.0.000"
 #endif

@@ -1,4 +1,4 @@
-// TTI P2 Data Analysis - Time  (EXE polyfill, V6.11.012)
+// TTI P2 Data Analysis - Time  (EXE polyfill, V6.11.013)
 // Part A: header version badge sync (UI display rule: header == cover page).
 // Part B: offline Excel export shim - XLSX.writeFile() relies on browser download
 //   support, which WebView2 does not expose like Chrome. Re-route through the
@@ -10,11 +10,11 @@
 //   the first row of the printed report. Explicit month names (never
 //   toLocaleDateString) keep every machine identical; re-stamped on every
 //   `beforeprint` so a long-open window prints the current day.
-// Part D: charts print at the full width of the page. See snapshotChartsForPrint.
+// Part D: charts print at the full width of the page. See prepareChartsForPrint.
 (function () {
   'use strict';
 
-  var EXE_VERSION = 'V6.11.012';
+  var EXE_VERSION = 'V6.11.013';
 
   // --- Part A: header version badge -----------------------------------------
   function applyExeVersion() {
@@ -65,19 +65,23 @@
   // in a .grid-2, which the print stylesheet stacks into one column. A Chart.js
   // canvas cannot follow that: it keeps the pixel size it measured on screen, so
   // the print showed the graph in the left half of the sheet with the right half
-  // empty. Chart.js cannot be told the print width either - the print layout is
-  // not built until after `beforeprint` - so each chart is redrawn at the width
-  // of a printed page, snapshotted to an <img> that the print stylesheet stretches
-  // to width:100%, and the live canvas is put back on `afterprint`.
+  // empty.
   //
-  // 720 CSS px is a printed A4/Letter portrait body (~190 mm with 10 mm margins),
-  // so the labels print at their on-screen size instead of being scaled down;
-  // rendering at 3x device pixels keeps the bitmap ~300 dpi on paper.
+  // So the chart is redrawn at the width of a printed page before the print dialog
+  // takes its snapshot, and the print stylesheet stretches that canvas to whatever
+  // width the sheet really has.
   //
-  // `stop()` matters: Chart.resize() while an animation is running only stores
-  // the size for the next frame, so the snapshot would capture the old, narrow
-  // chart. Measured in the app's bundled Chart.js 4.4.1: a 457 px wide canvas
-  // snapshots at 2160x960 this way and comes back to 457x320 afterwards.
+  // Drawing on the canvas itself - and NOT on an <img> copy of it - is deliberate.
+  // The first attempt swapped in a data-URL <img> during `beforeprint`; a data URL
+  // is still decoding when the print engine snapshots the page, so every chart
+  // printed blank. A canvas bitmap is already rendered at that point.
+  //
+  // 720 CSS px is a printed A4/Letter portrait body (~190 mm with 10 mm margins);
+  // rendering at 3x device pixels keeps ~300 dpi on paper.
+  //
+  // `stop()` matters: Chart.resize() during an animation only queues the size for
+  // the next frame, so the old, narrow chart would print (measured on the bundled
+  // Chart.js 4.4.1).
   var PRINT_CHART_WIDTH = 720;
   var PRINT_CHART_DPR = 3;
   var _printChartState = [];
@@ -87,54 +91,37 @@
     var st = document.createElement('style');
     st.id = 'tti-print-chart-style';
     st.textContent =
-      '.tti-print-chart{display:none;}'
-      + '@media print{'
-      // the snapshot replaces the canvas and fills whatever width the page has
-      + '.tti-print-chart{display:block !important;width:100% !important;height:auto !important;}'
-      + '.tti-print-chart-original{display:none !important;}'
-      // let the image define the height (the on-screen box is a fixed 320px)
+      '@media print{'
+      // the fixed 320px on-screen box must not cut a page-wide chart in half
       + '.chart-box{height:auto !important;padding:0 !important;}'
+      // ...and the canvas fills the sheet, keeping its aspect from the bitmap
+      + '.chart-box canvas{width:100% !important;height:auto !important;max-width:100% !important;}'
       + '}';
     document.head.appendChild(st);
   }
 
-  function snapshotChartsForPrint() {
+  function prepareChartsForPrint() {
     printChartStyle();
-    restoreChartsAfterPrint();                 // never stack two snapshots
+    if (_printChartState.length) return;       // already page-wide
     var live = window.charts;
     if (!live) return;
     for (var k in live) {
       if (!Object.prototype.hasOwnProperty.call(live, k)) continue;
       var ch = live[k];
-      if (!ch || !ch.canvas || typeof ch.toBase64Image !== 'function') continue;
+      if (!ch || !ch.canvas || !ch.resize || !ch.update) continue;
       var canvas = ch.canvas;
       var screenW = canvas.clientWidth;
       var screenH = canvas.clientHeight;
       if (!screenW || !screenH) continue;      // chart not drawn yet
-      var src = null;
       try {
         ch.stop();
         ch.options.devicePixelRatio = PRINT_CHART_DPR;
         ch.resize(PRINT_CHART_WIDTH, screenH);
         ch.update('none');                     // draw now, no animation frame
-        src = ch.toBase64Image();
+        _printChartState.push({ chart: ch, w: screenW, h: screenH });
       } catch (e) {
-        src = null;
-      } finally {
-        ch.options.devicePixelRatio = undefined;
-        ch.stop();
-        ch.resize(screenW, screenH);           // back to the on-screen size
+        try { ch.options.devicePixelRatio = undefined; } catch (e2) { /* ignore */ }
       }
-      if (!src) continue;
-      try {
-        var img = document.createElement('img');
-        img.className = 'tti-print-chart';
-        img.alt = '';
-        img.src = src;
-        canvas.parentNode.insertBefore(img, canvas.nextSibling);
-        canvas.classList.add('tti-print-chart-original');
-        _printChartState.push({ chart: ch, canvas: canvas, img: img });
-      } catch (e) { /* printing still works, just not full width */ }
     }
   }
 
@@ -142,10 +129,9 @@
     for (var i = 0; i < _printChartState.length; i++) {
       var s = _printChartState[i];
       try {
-        if (s.img.parentNode) s.img.parentNode.removeChild(s.img);
-        s.canvas.classList.remove('tti-print-chart-original');
         s.chart.stop();
-        s.chart.resize();                      // let Chart.js re-measure its box
+        s.chart.options.devicePixelRatio = undefined;
+        s.chart.resize(s.w, s.h);              // back to the on-screen size
       } catch (e) { /* keep going */ }
     }
     _printChartState = [];
@@ -155,14 +141,17 @@
     if (window.__ttiPrintChartsHooked) return;
     window.__ttiPrintChartsHooked = true;
     printChartStyle();
-    window.addEventListener('beforeprint', snapshotChartsForPrint);
+    window.addEventListener('beforeprint', prepareChartsForPrint);
     window.addEventListener('afterprint', restoreChartsAfterPrint);
-    // WebView2's print preview also reaches the page as a media change, and
-    // Ctrl+P in some hosts skips `beforeprint` - cover both paths.
+    // No `focus` fallback here on purpose: Chromium also fires focus while the
+    // print preview is open, and restoring the charts at that moment prints them
+    // stretched over the sheet (measured: 3 pages, upscaled labels).
+    // WebView2's print preview also reaches the page as a media change, and Ctrl+P
+    // in some hosts skips `beforeprint` - cover both paths.
     if (window.matchMedia) {
       var mq = window.matchMedia('print');
       var onChange = function (m) {
-        if (m.matches) snapshotChartsForPrint();
+        if (m.matches) prepareChartsForPrint();
         else restoreChartsAfterPrint();
       };
       if (mq.addEventListener) mq.addEventListener('change', onChange);

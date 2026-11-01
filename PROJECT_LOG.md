@@ -1490,3 +1490,49 @@ Reinstalled 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities` with
 "TTI Tools & Utilities V6.11.012"). `TTI_P2DataAnalysisTime.exe` verified at `6.11.12.0` and the
 installed binary carries the new `tti-print-chart` / `snapshotChartsForPrint` code. The other eight
 EXEs stay at `6.11.11.0` - only this tool's behaviour changed.
+
+## 2026-11-01 - print/PDF charts were blank: fix by printing the canvas, not an <img> copy - P2 Data Analysis - Time V6.11.013
+
+Report: after V6.11.012 all three charts were MISSING from the printed PDF (before that they
+printed, but the two side-by-side ones were half width).
+
+Cause: the V6.11.012 fix swapped each chart for a data-URL `<img>` inside `beforeprint`. A data
+URL is still decoding when the print engine snapshots the page - measured in a probe page: the
+image reported `naturalWidth 0` immediately after insertion and only decoded on a later tick - so
+the print saw an empty image, and the canvas it replaced was hidden by the print CSS. Every chart
+vanished.
+
+Fix: keep the chart on its canvas. `beforeprint` now only redraws each chart page-wide (720 CSS
+px, 3x device pixels, `stop()` first) and the print CSS stretches `canvas` to `width:100%` with
+`height:auto`; `afterprint` resizes back. A canvas bitmap is already rendered when the engine
+snapshots, so nothing depends on decode timing.
+
+Verified with a real PDF, not by inspection: the probe page (real page CSS + real polyfill.js +
+Chart.js 4.4.1) printed with headless Edge `--print-to-pdf`, and all three charts came out full
+page width, sharp, over 2 pages - 75,568 bytes, identical to the pre-image attempt's output.
+
+Also tried and rejected: restoring the charts on window `focus` as a fallback for a preview closed
+without `afterprint`. Chromium fires `focus` while the preview is open, so printing then produced
+3 pages with 1.6x upscaled, blurry charts - the listener is gone and the reason is in the code.
+
+Installer naming: `build-installer.ps1` used to name the setup after the *launcher* version, so two
+different releases could share a filename (the broken V6.11.012 and this one). It now uses the
+NEWEST version in the manifest (each EXE keeps its own version), which gives every release a fresh,
+ordering-correct name: launcher V6.11.012 + p2-analysis-time V6.11.013 -> `..._V6.11.013.exe`. The
+post-install check now compares every installed EXE against the payload it came from instead of
+comparing the launcher against one number.
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.P2DataAnalysisTime/Resources/polyfill.js` | Part D rewritten: `prepareChartsForPrint` resizes the charts and lets the print CSS stretch the canvas; image snapshot removed; `EXE_VERSION` -> `V6.11.013`. |
+| modified | `src/Htxb.P2DataAnalysisTime/Htxb.P2DataAnalysisTime.csproj` | `Version` + `FileVersion` -> `6.11.13.0`. |
+| modified | `.data2/manifest.json` | `p2-analysis-time` -> `6.11.13.0`. |
+| modified | `build-installer.ps1` | Setup named after the newest tool version; staleness check covers every tool; install verify compares all nine EXEs with `dist\`. |
+| modified | `installer/installer.iss` | Comment corrected to say where the suite version comes from. |
+Reinstalled 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities` as
+`installer\out\TTI_Utilities_Setup_V6.11.013.exe` (3.5 MB, SHA-256
+`AD4C9112C099EB5B0F5FCB60FF61DFB0A7AF5717C819FEF3944D72C6AD685459`), registered as
+"TTI Tools & Utilities V6.11.013". Installed `TTI_P2DataAnalysisTime.exe` is `6.11.13.0` and the
+binary carries the canvas-print code (`prepareChartsForPrint`) with no trace of the image snapshot.
+The two superseded setups (`..._V6.11.011.exe`, `..._V6.11.012.exe` - the latter being the release
+whose charts printed blank) were deleted so only the current one remains.

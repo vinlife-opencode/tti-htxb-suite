@@ -59,24 +59,44 @@ $exes = @(Get-ChildItem -LiteralPath $dist -Filter *.exe)
 if ($exes.Count -ne 9) {
     throw "dist\ holds $($exes.Count) EXE(s), expected 9 - run build.ps1 again."
 }
-foreach ($need in @('TTI_Utils_Launcher.exe', 'data2\manifest.json', 'configuration\tools.ini')) {    if (-not (Test-Path -LiteralPath (Join-Path $dist $need))) {
+foreach ($need in @('TTI_Utils_Launcher.exe', 'data2\manifest.json', 'configuration\tools.ini')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $dist $need))) {
         throw "dist\$need is missing - run build.ps1 again."
     }
 }
 
-# ---- version: the launcher entry in the manifest is the suite version --------
+# ---- version: the newest tool in the manifest is the suite version -----------
+# Each EXE carries its own version (project rule), so "the suite version" is the
+# highest number it contains. Naming the setup after the launcher alone produced
+# two different setups under one filename when only a tool changed; naming it
+# after the newest tool means every release gets a fresh, ordering-correct name
+# (launcher V6.11.012 + p2-analysis-time V6.11.013 -> setup V6.11.013).
 $manifestRepo = Get-Content -LiteralPath (Join-Path $root '.data2\manifest.json') -Raw | ConvertFrom-Json
 $manifestDist = Get-Content -LiteralPath (Join-Path $dist 'data2\manifest.json') -Raw | ConvertFrom-Json
-$ver = [string]$manifestRepo.tools.launcher.version
-if ([string]$manifestDist.tools.launcher.version -ne $ver) {
-    throw ("dist\data2\manifest.json is stale ({0}) - the repo says {1}; run build.ps1 again." -f `
-        $manifestDist.tools.launcher.version, $ver)
-}
-if ($ver -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "unexpected version string: '$ver'" }
 
-# Windows VersionInfo needs the 4-part number as-is (6.11.11.0).
+function ConvertTo-VersionKey([string] $v) {
+    $p = @($v.Split('.') | ForEach-Object { [int]$_ })
+    while ($p.Count -lt 4) { $p += 0 }
+    return ([long]$p[0] * 1000000000) + ([long]$p[1] * 1000000) + ([long]$p[2] * 1000) + [long]$p[3]
+}
+
+$ver = $null
+foreach ($id in $manifestRepo.tools.PSObject.Properties.Name) {
+    $repoVer = [string]$manifestRepo.tools.$id.version
+    if ($repoVer -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "unexpected version string for '$id': '$repoVer'" }
+    $distVer = [string]$manifestDist.tools.$id.version
+    if ($distVer -ne $repoVer) {
+        throw ("dist\data2\manifest.json is stale for '{0}' ({1}) - the repo says {2}; run build.ps1 again." -f `
+            $id, $distVer, $repoVer)
+    }
+    if (-not $ver -or (ConvertTo-VersionKey $repoVer) -gt (ConvertTo-VersionKey $ver)) { $ver = $repoVer }
+}
+if (-not $ver) { throw 'no tool versions found in .data2\manifest.json' }
+$launcherVer = [string]$manifestRepo.tools.launcher.version
+
+# Windows VersionInfo needs the 4-part number as-is (6.11.13.0).
 $appNum = $ver
-# Display form V<year>.<month>.<day><run>: 6.11.11.0 -> V6.11.011
+# Display form V<year>.<month>.<day><run>: 6.11.13.0 -> V6.11.013
 $p = $ver.Split('.')
 $ddr = [string]$p[2]
 while ($ddr.Length -lt 3) { $ddr = '0' + $ddr }
@@ -84,6 +104,7 @@ $appVer = 'V{0}.{1}.{2}' -f [int]$p[0], ([string]$p[1]).PadLeft(2, '0'), $ddr
 $outName = "TTI_Utilities_Setup_$appVer"
 
 Write-Host "Suite version: $appVer   (VersionInfo $appNum)"
+Write-Host "Launcher     : $launcherVer"
 Write-Host "Payload      : $($exes.Count) EXEs + data2 + configuration"
 Write-Host "Output       : installer\out\$outName.exe"
 
@@ -183,18 +204,24 @@ $proc = Start-Process -FilePath $setup -ArgumentList $installArgs -Wait -PassThr
 if ($proc.ExitCode -ne 0) { throw "installer failed with exit code $($proc.ExitCode)" }
 
 # ---- verify ------------------------------------------------------------------
+# The suite name is now the newest tool's version, so check the installed EXEs
+# against the payload they came from instead of against one number.
 $exe = Join-Path $InstallDir $appExe
 if (-not (Test-Path -LiteralPath $exe)) { throw "install finished but $exe is missing" }
-$installedVersion = (Get-Item -LiteralPath $exe).VersionInfo.FileVersion
 Write-Host ''
 Write-Host 'Installed:'
 Write-Host "  folder  : $InstallDir"
-Write-Host "  launcher: $appExe  ($installedVersion)"
-Get-ChildItem -LiteralPath $InstallDir -Filter *.exe | Where-Object { $_.Name -ne 'unins000.exe' } | ForEach-Object {
-    Write-Host ("    {0,-30} {1}" -f $_.Name, $_.VersionInfo.FileVersion)
+$mismatch = @()
+Get-ChildItem -LiteralPath $InstallDir -Filter *.exe | Where-Object { $_.Name -ne 'unins000.exe' } | Sort-Object Name | ForEach-Object {
+    $installed = $_.VersionInfo.FileVersion
+    $payload = Join-Path $dist $_.Name
+    $expected = if (Test-Path -LiteralPath $payload) { (Get-Item -LiteralPath $payload).VersionInfo.FileVersion } else { '?' }
+    $flag = if ($installed -eq $expected) { '' } else { "  <-- expected $expected" }
+    if ($installed -ne $expected) { $mismatch += $_.Name }
+    Write-Host ("    {0,-30} {1}{2}" -f $_.Name, $installed, $flag)
 }
-if ($installedVersion -ne $appNum) {
-    throw "installed launcher reports $installedVersion, expected $appNum - the upgrade did not land."
+if ($mismatch.Count -gt 0) {
+    throw ("installed EXE(s) differ from the payload: {0} - the upgrade did not land." -f ($mismatch -join ', '))
 }
 Write-Host ''
 Write-Host 'Done.'

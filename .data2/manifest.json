@@ -47,7 +47,7 @@
     "p2-analysis-time": {
       "name": "P2 Data Analysis - Time",
       "exe": "TTI_P2DataAnalysisTime.exe",
-      "version": "6.11.12.0",
+      "version": "6.11.13.0",
       "source": "src/Htxb.P2DataAnalysisTime/Resources/index.html"
     },
     "barcode-generator": {
