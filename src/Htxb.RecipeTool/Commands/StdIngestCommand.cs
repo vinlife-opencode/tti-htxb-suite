@@ -44,7 +44,7 @@ internal static class StdIngestCommand
             if (logs.Count == 0)
                 throw new UsageException($"No slot log under {namesFrom}.");
 
-            build = StdTableBuilder.ApplyLoggedNames(build, SlotCsvReader.ReadTestNames(logs[0]));
+            build = StdTableBuilder.ApplyLoggedNames(build, SlotCsvReader.ReadStepNames(logs[0]));
         }
 
         StdTableWriter.Write(output, build, withRelativeColumn: true);

@@ -27,8 +27,41 @@ public static class SlotCsvReader
         "Test Data",
     };
 
-    /// <summary>The step names in the slot's <c>Test Data</c> section, in log order.</summary>
-    public static IReadOnlyList<string> ReadTestNames(string path)
+    /// <summary>
+    /// Names that sit in the <c>Test Name</c> column but are not test steps. The
+    /// same list as <c>bidfgen.tools.std_ingest.SKIP</c>, compared squashed.
+    /// </summary>
+    private static readonly HashSet<string> NotAStep = new(StringComparer.Ordinal)
+    {
+        "datatransfer", "rampdown", "totstresstime", "totbitime",
+    };
+
+    /// <summary>
+    /// The step names the slot ran, in the order they first appear.
+    ///
+    /// Distinct on purpose: the <c>Test Data</c> block carries one row per
+    /// measurement, so a step measured twice appears twice. What a caller needs is
+    /// the plan - the names a limits table has to cover - not the measurements.
+    /// Rows that are not steps (<c>DATA TRANSFER</c>, <c>RAMP DOWN</c>, the totals)
+    /// are dropped, exactly as <c>bidfgen.tools.std_ingest.SKIP</c> drops them.
+    /// </summary>
+    public static IReadOnlyList<string> ReadStepNames(string path)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (string name in ReadMeasurementNames(path))
+        {
+            string key = Key(name);
+            if (key.Length == 0 || NotAStep.Contains(key)) continue;
+            if (seen.Add(name)) names.Add(name);
+        }
+
+        return names;
+    }
+
+    /// <summary>One entry per measurement row, in log order, duplicates kept.</summary>
+    private static IReadOnlyList<string> ReadMeasurementNames(string path)
     {
         if (!File.Exists(path)) throw new FileNotFoundException("slot log not found", path);
 

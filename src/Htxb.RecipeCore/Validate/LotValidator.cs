@@ -367,7 +367,7 @@ public static class LotValidator
 
         foreach (string log in logs)
         {
-            var absent = SlotCsvReader.ReadTestNames(log)
+            var absent = SlotCsvReader.ReadStepNames(log)
                 .Select(TestName.Normalise)
                 .Where(n => n.Length > 0 && !known.Contains(n))
                 .Distinct(StringComparer.Ordinal)

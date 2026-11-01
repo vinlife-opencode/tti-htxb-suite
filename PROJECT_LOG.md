@@ -1307,3 +1307,23 @@ Three defects found in the Python tools while porting, all fixed by the port:
 the single-`.bidf` read (a lot has 24), the name taken through `test_id` instead of
 `note` (which hides a `_1`/`_3` swap), and the per-bin count that grouped by
 `(hwbin, hwbin_desc, swbin)` and kept one row per bin.
+### 2026-11-01 - names read once, not once per measurement
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.RecipeCore/Ingest/SlotCsvReader.cs` | `ReadStepNames`: distinct, first-seen order, non-step rows dropped - the plan, not the measurements. `bidfgen.tools.std_ingest.logged_step_list` de-duplicated; the port did not. |
+| modified | `src/Htxb.RecipeCore/Validate/LotValidator.cs`, `src/Htxb.RecipeTool/Commands/StdIngestCommand.cs` | Both now take step names, not measurement rows. |
+| modified | `tests/Htxb.RecipeCore.Tests/ToolTests.cs` | 3 checks: a BRJJ slot log yields 32 distinct names from 66 rows; the pairing guard refuses a short list and a wrong step; the re-issue decorations are the only thing `Base()` ignores. |
+
+Found by running `std-ingest --names-from` against a real lot: every pairing was
+refused with *"the log has 66 steps, the workbook 32"*, because the `Test Data`
+block has one row per measurement and a step measured twice appears twice. The
+older test run never exercised that path - `validate-lot` normalises and
+de-duplicates before comparing, so it masked the same mistake.
+
+Re-measured: `Htxb.RecipeTool std-ingest P_TM_BRJJ_B_09_4_32.xlsx --names-from
+<10110906873901KA_20261028170220_CSV>` -> `tests 32, renamed 8, without bin 0`
+(the eight are `IGSS_20V_1`, `HTGB`, `HTRB6_R`, `HTGB_HT6_R`, `HTRB7_R`,
+`HTGB_HT7_R`, `HTRB8_R`, `HTGB_HT8_R`); the same command with the BRF9 workbook
+against a BRF9 log is still refused (34 vs 32). `test-recipetool.ps1` ->
+`86 passed, 0 failed, 0 skipped`.

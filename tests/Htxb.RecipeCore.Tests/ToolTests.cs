@@ -29,11 +29,77 @@ internal static class ToolTests
         Log.Section("tools: writer");
         RegisterWriter(runner);
 
+        Log.Section("tools: ingest");
+        RegisterIngest(runner, samplesRoot);
+
         Log.Section("tools: std-align");
         RegisterAligned(runner, samplesRoot, zadzRoot, tablesRoot);
 
         Log.Section("tools: validate-lot");
         RegisterValidate(runner, samplesRoot, tablesRoot);
+    }
+
+    // ------------------------------------------------------------------- ingest
+
+    private static void RegisterIngest(Runner runner, string samplesRoot)
+    {
+        string? log = FindSlotLog(samplesRoot);
+        if (log is null)
+        {
+            runner.Skip("the slot log names each step once", "no BRJJ slot log on this machine");
+            return;
+        }
+
+        runner.Check("the slot log names each step once", () =>
+        {
+            // The Test Data block carries one row per measurement, so a step measured
+            // twice appears twice. A limits table needs the plan, not the measurements
+            // - the first version of this reader returned all 66 rows and every
+            // --names-from pairing was refused as "the two are not the same plan".
+            var names = SlotCsvReader.ReadStepNames(log);
+            Assert.Equal(32, names.Count, "distinct step names");
+            Assert.Equal(names.Distinct(StringComparer.Ordinal).Count(), names.Count, "duplicates");
+            Assert.True(!names.Any(n => TestName.Normalise(n) == "rampdown"), "RAMP DOWN is not a step");
+        });
+
+        runner.Check("logged names are applied only when the plans really match", () =>
+        {
+            var names = SlotCsvReader.ReadStepNames(log);
+
+            // Rename one row of a synthetic build so the guard has something to
+            // refuse: HTRB6_R -> HTRB6 is the real re-issue, and HTGB1 is not.
+            var build = new StdTableBuild(
+                names.Select((n, i) => new object?[]
+                {
+                    (i + 1).ToString(), i + 1, string.Empty, n, string.Empty, string.Empty,
+                    string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
+                    string.Empty, 2, "196 = F_PRE_ON", "Yes", string.Empty,
+                }).ToList(), []);
+
+            StdTableBuild renamed = StdTableBuilder.ApplyLoggedNames(build, names);
+            Assert.Equal(0, renamed.Renamed, "renamed with identical names");
+
+            var shorter = names.Take(names.Count - 1).ToList();
+            bool refused = false;
+            try { StdTableBuilder.ApplyLoggedNames(build, shorter); }
+            catch (InvalidDataException) { refused = true; }
+            Assert.True(refused, "a shorter log must be refused, not paired");
+
+            var swapped = names.ToList();
+            swapped[0] = "SOMETHING ELSE";
+            refused = false;
+            try { StdTableBuilder.ApplyLoggedNames(build, swapped); }
+            catch (InvalidDataException) { refused = true; }
+            Assert.True(refused, "a row that is not the same step must be refused");
+        });
+
+        runner.Check("the re-issue decorations are the only thing ignored", () =>
+        {
+            Assert.Equal(TestName.Base("HTGB"), TestName.Base("HTGB1"), "HTGB == HTGB1");
+            Assert.Equal(TestName.Base("HTRB6_R"), TestName.Base("HTRB6"), "HTRB6_R == HTRB6");
+            Assert.Equal(TestName.Base("IGSS_20V_1"), TestName.Base("IGSS_+20V_1"), "IGSS_20V_1 == IGSS_+20V_1");
+            Assert.True(TestName.Base("HTGB") != TestName.Base("HTRB6"), "HTGB != HTRB6");
+        });
     }
 
     // ------------------------------------------------------------------- writer
@@ -280,7 +346,23 @@ internal static class ToolTests
     /// The processed lots of the post-change run. They sit beside the delivery
     /// folder, not inside it, so the search covers the parent as well.
     /// </summary>
-    private static string? FindPostRun(string samplesRoot)
+    private static string? FindPostRun(string samplesRoot) =>
+        SearchBeside(samplesRoot, "2108 post log files");
+
+    /// <summary>A BRJJ slot log from the processed run, used to prove name handling.</summary>
+    private static string? FindSlotLog(string samplesRoot)
+    {
+        string? run = FindPostRun(samplesRoot);
+        if (run is null) return null;
+
+        return Directory.EnumerateFiles(run, "*_SLOT1_*.csv", SearchOption.AllDirectories)
+            .Where(p => Path.GetFileName(p).StartsWith("P_TM_BRJJ_B_09_4_32", StringComparison.Ordinal))
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+    }
+
+    /// <summary>A directory that may sit inside the delivery folder or beside it.</summary>
+    private static string? SearchBeside(string samplesRoot, string name)
     {
         foreach (string? candidate in new[]
                  {
@@ -290,7 +372,7 @@ internal static class ToolTests
         {
             if (candidate is null || !Directory.Exists(candidate)) continue;
             string? hit = Directory
-                .EnumerateDirectories(candidate, "2108 post log files", SearchOption.AllDirectories)
+                .EnumerateDirectories(candidate, name, SearchOption.AllDirectories)
                 .FirstOrDefault();
             if (hit is not null) return hit;
         }
