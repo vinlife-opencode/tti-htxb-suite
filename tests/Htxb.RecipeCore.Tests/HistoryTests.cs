@@ -155,6 +155,67 @@ internal static class HistoryTests
             catch (InvalidDataException) { refused = true; }
             Assert.True(refused, "a non-lot folder must be refused, not reported");
         });
+
+        // -- recovery ----------------------------------------------------------
+        runner.Check("only a Completed lot without a BiDF can be recovered", () =>
+        {
+            using var site = new Site();
+            site.AddLot(RawStatus: "Completed", withFinal: true, withArchive: true, bidf: 0, summaries: 0);
+            Assert.True(LotRecovery.CanRecover(site.Scan(), site.Options.ArchiveDirectory, site.ProcessPath).Can,
+                "a report-only lot should be recoverable");
+
+            var full = new Site();
+            try
+            {
+                full.AddLot(RawStatus: "Completed", withFinal: true, withArchive: true, bidf: 2, summaries: 2);
+                Assert.True(!LotRecovery.CanRecover(full.Scan(), full.Options.ArchiveDirectory, full.ProcessPath).Can,
+                    "a lot with a BiDF must not be offered");
+
+                var stopped = new Site();
+                try
+                {
+                    stopped.AddLot(RawStatus: "Manual Stop", withFinal: false, withArchive: true, bidf: 0, summaries: 0);
+                    Assert.True(!LotRecovery.CanRecover(stopped.Scan(), stopped.Options.ArchiveDirectory, stopped.ProcessPath).Can,
+                        "a hand-stopped lot must not be offered");
+                }
+                finally { stopped.Dispose(); }
+            }
+            finally { full.Dispose(); }
+        });
+
+        runner.Check("recovery backs the old output up and stages the raw CSVs", () =>
+        {
+            using var site = new Site();
+            site.AddLot(RawStatus: "Completed", withFinal: true, withArchive: true, bidf: 0, summaries: 0);
+            LotHistory lot = site.Scan();
+
+            string history = Path.Combine(site.Root, "history");
+            RecoveryOutcome outcome = LotRecovery.Recover(lot, site.Options.FinalDirectory,
+                site.Options.ArchiveDirectory, site.ProcessPath, history, new DateTime(2026, 11, 1, 12, 0, 0));
+
+            Assert.True(!Directory.Exists(site.FinalPath(Lot, Stamp)), "the old output must be gone from 1_Log_Final");
+            Assert.True(Directory.Exists(outcome.BackupPath), $"no backup at {outcome.BackupPath}");
+            Assert.True(File.Exists(Path.Combine(outcome.BackupPath, "Slot01",
+                    $"{Recipe}_SLOT1_{Stamp}_Rpt.xlsx")), "the old report must be in the backup");
+            Assert.True(Directory.Exists(site.ArchivePath(Lot, Stamp)), "the archive copy must stay");
+
+            string staged = Path.Combine(site.ProcessPath, $"{Lot}_{Stamp}");
+            Assert.Equal(staged, outcome.StagedPath, "staged folder");
+            Assert.True(File.Exists(Path.Combine(staged, "Slot01", $"{Recipe}_SLOT1_{Stamp}.csv")),
+                "the raw CSV must be in the process folder");
+        });
+
+        runner.Check("recovery refuses a lot whose process folder is already taken", () =>
+        {
+            using var site = new Site();
+            site.AddLot(RawStatus: "Completed", withFinal: true, withArchive: true, bidf: 0, summaries: 0);
+            LotHistory lot = site.Scan();
+            Directory.CreateDirectory(Path.Combine(site.ProcessPath, $"{Lot}_{Stamp}"));
+
+            (bool can, string why) = LotRecovery.CanRecover(lot, site.Options.ArchiveDirectory, site.ProcessPath);
+            Assert.True(!can, "must refuse");
+            Assert.True(why.Contains("process folder", StringComparison.Ordinal), why);
+        });
     }
 
     // -------------------------------------------------------------------- real
@@ -246,6 +307,9 @@ internal static class HistoryTests
 
         public string ArchivePath(string lot, string stamp) =>
             Path.Combine(Root, "archive", $"{lot}_{stamp}_CSV");
+
+        /// <summary>The folder the watcher polls.</summary>
+        public string ProcessPath => Path.Combine(Root, "process");
 
         public HistoryOptions Options => new()
         {

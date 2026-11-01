@@ -39,6 +39,7 @@ $proj = Join-Path $root 'tests\Htxb.RecipeCore.Tests\Htxb.RecipeCore.Tests.cspro
 $exe  = Join-Path $root 'tests\Htxb.RecipeCore.Tests\bin\Release\net8.0\Htxb.RecipeCore.Tests.exe'
 $toolProj = Join-Path $root 'src\Htxb.RecipeTool\Htxb.RecipeTool.csproj'
 $tool     = Join-Path $root 'src\Htxb.RecipeTool\bin\Release\net8.0\Htxb.RecipeTool.exe'
+$uiProj   = Join-Path $root 'src\Htxb.HistoryUi\Htxb.HistoryUi.csproj'
 
 if (-not (Test-Path -LiteralPath $proj)) { throw "test project not found: $proj" }
 
@@ -69,6 +70,8 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw 'Build failed: Htxb.RecipeCore.Tests' }
     dotnet build $toolProj -c Release --nologo
     if ($LASTEXITCODE -ne 0) { throw 'Build failed: Htxb.RecipeTool' }
+    dotnet build $uiProj -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Build failed: Htxb.HistoryUi' }
     Write-Host ''
 }
 
