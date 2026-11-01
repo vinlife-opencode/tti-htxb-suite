@@ -187,15 +187,20 @@ internal static class RealDataTests
             Assert.Equal("Std_11_BRI9_B.xlsx", row!.StdTable, "BRI9 std table");
         });
 
-        runner.Check("std table column counts: Std_02 has 16, Std_02b has 17", () =>
+        // Std_02b (the 17-column sample) was withdrawn on 2026-11-01, and every table
+        // the site now runs is written by std-align: 16 columns, no relative section.
+        // The 17-column writer path is covered by the tools suite instead.
+        runner.Check("every shipped table has the 16 columns the machines read", () =>
         {
-            var to247 = delivery.Table("Std_02_ST_TO247.xlsx");
-            var brf9 = delivery.Table("Std_02b_ST_BRF9.xlsx");
+            var tables = delivery.AllTables();
+            Assert.Equal(22, tables.Count, "table count in the fixture");
 
-            Assert.Equal(16, to247.Columns.Count, "Std_02 column count");
-            Assert.Equal(17, brf9.Columns.Count, "Std_02b column count");
-            Assert.True(!to247.HasRelativeSectionColumn, "Std_02 must report the missing relative column");
-            Assert.True(brf9.HasRelativeSectionColumn, "Std_02b must have 'Test Sect ID Relative'");
+            foreach (var table in tables)
+            {
+                Assert.Equal(16, table.Columns.Count, $"{table.FileName} column count");
+                Assert.True(!table.HasRelativeSectionColumn,
+                    $"{table.FileName} must not carry 'Test Sect ID Relative'");
+            }
         });
 
         // Still 0 FITS, and that is correct: since 2026-11-01 every table is built by

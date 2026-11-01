@@ -173,6 +173,36 @@ internal static class ToolTests
             }
         });
 
+        // The 17-column shape std-ingest writes - no shipped table carries it (Std_02b
+        // was the last one and was withdrawn on 2026-11-01), so the reader's support for
+        // the optional 'Test Sect ID Relative' column is proved here instead.
+        runner.Check("the 17-column ingest shape round-trips", () =>
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"htxb-ingest-{Guid.NewGuid():N}.xlsx");
+            try
+            {
+                var build = new StdTableBuild(
+                [
+                    new object?[]
+                    {
+                        "1", 1, "1000", "PRETEST CLOSED", 60, 1, "20V", "10V", 170, 225, "µA",
+                        string.Empty, 3, "196 = F_PRE_ON", "Yes", "for MOSBTS", 0,
+                    },
+                ], []);
+
+                StdTableWriter.Write(path, build, withRelativeColumn: true);
+                StdTable table = StdTableAdapter.Read(path);
+
+                Assert.Equal(17, table.Columns.Count, "columns");
+                Assert.True(table.HasRelativeSectionColumn, "must report the relative column");
+                Assert.Equal("0", table.Tests[0].SectionIdRelative, "relative section id");
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        });
+
         runner.Check("a limit in a unit the engine cannot read is converted, not copied", () =>
         {
             var step = new PlanStep
