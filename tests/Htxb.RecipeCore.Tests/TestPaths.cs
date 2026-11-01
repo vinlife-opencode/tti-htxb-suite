@@ -35,9 +35,10 @@ internal static class TestPaths
         @"D:\_TTI-Dev\_Proj_BidfGen2\docs\test-vectors\recipe-aliases.json";
 
     /// <summary>
-    /// The tables and profile CSV the site actually runs with. The tools are checked
-    /// against these because they are what the Python tools produced, so a difference
-    /// here is a regression; the tracked fixture is the fallback for a fresh clone.
+    /// The tables and profile CSV the site actually runs with. Preferred over the
+    /// tracked fixture when it is on this machine, because it is the configuration
+    /// the checks are about; the fixture is a byte-identical copy for a fresh clone.
+    /// `--tables DIR` overrides both.
     /// </summary>
     public const string InstalledTables = @"C:\TTI_PostDataProcessor\Configuration\Recipe_Std_Table";
 }

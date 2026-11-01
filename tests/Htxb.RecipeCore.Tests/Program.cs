@@ -28,7 +28,8 @@ internal static class Program
 
         string vectorsPath = TestPaths.DefaultVectors;
         string samplesRoot = TestPaths.DefaultSamples;
-        string tablesRoot = TestPaths.DefaultTables;
+        string tablesRoot = Directory.Exists(TestPaths.InstalledTables)
+            ? TestPaths.InstalledTables : TestPaths.DefaultTables;
         string zadzRoot = Directory.Exists(TestPaths.DefaultZadz)
             ? TestPaths.DefaultZadz : TestPaths.FixtureZadz;
         bool quiet = false;

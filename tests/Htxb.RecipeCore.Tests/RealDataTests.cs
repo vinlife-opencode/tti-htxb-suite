@@ -177,28 +177,33 @@ internal static class RealDataTests
             Assert.True(recipe.Steps.All(s => s.Row >= 10), "SQGW steps must start below header row 8");
         });
 
-        runner.Check("profile CSV has 7 STM rows and finds BRI9", () =>
+        runner.Check("profile CSV has 17 STM rows and finds BRI9", () =>
         {
             int stm = delivery.ProfileRows.Count(r => r.Customer == "STM");
-            Assert.Equal(7, stm, "STM profile row count");
+            Assert.Equal(17, stm, "STM profile row count");
 
             var row = ProfileCsvAdapter.Find(delivery.ProfileRows, "P_TM_BRI9_B_07_4_32");
             Assert.True(row is not null, "BRI9 must have a profile row");
-            Assert.Equal("Std_02_ST_TO247.xlsx", row!.StdTable, "BRI9 std table");
+            Assert.Equal("Std_11_BRI9_B.xlsx", row!.StdTable, "BRI9 std table");
         });
 
-        runner.Check("std table column counts: Std_02 has 16, Std_07 has 17", () =>
+        runner.Check("std table column counts: Std_02 has 16, Std_02b has 17", () =>
         {
             var to247 = delivery.Table("Std_02_ST_TO247.xlsx");
-            var v1200 = delivery.Table("Std_07_ST_1200V.xlsx");
+            var brf9 = delivery.Table("Std_02b_ST_BRF9.xlsx");
 
             Assert.Equal(16, to247.Columns.Count, "Std_02 column count");
-            Assert.Equal(17, v1200.Columns.Count, "Std_07 column count");
+            Assert.Equal(17, brf9.Columns.Count, "Std_02b column count");
             Assert.True(!to247.HasRelativeSectionColumn, "Std_02 must report the missing relative column");
-            Assert.True(v1200.HasRelativeSectionColumn, "Std_07 must have 'Test Sect ID Relative'");
+            Assert.True(brf9.HasRelativeSectionColumn, "Std_02b must have 'Test Sect ID Relative'");
         });
 
-        runner.Check("the measured fit matrix: 0/17 FITS, 4 MISMATCH, 13 NO_PROFILE", () =>
+        // Still 0 FITS, and that is correct: since 2026-11-01 every table is built by
+        // std-align, so it carries the names the tester logs (HTGB1, HTRB6) while the
+        // workbook carries the customer's (HTGB, HTRB6_R). A fit compares the two name
+        // lists, so an aligned table can never "fit" its workbook - validate-lot is the
+        // gate that proves the table matches the run.
+        runner.Check("the measured fit matrix: 0/17 FITS, 17 MISMATCH, 0 NO_PROFILE", () =>
         {
             var verdicts = new Dictionary<string, FitVerdict>(StringComparer.Ordinal);
 
@@ -213,24 +218,43 @@ internal static class RealDataTests
             }
 
             Assert.Equal(0, verdicts.Values.Count(v => v == FitVerdict.Fits), "FITS");
-            Assert.Equal(4, verdicts.Values.Count(v => v == FitVerdict.Mismatch), "MISMATCH");
-            Assert.Equal(13, verdicts.Values.Count(v => v == FitVerdict.NoProfile), "NO_PROFILE");
+            Assert.Equal(17, verdicts.Values.Count(v => v == FitVerdict.Mismatch), "MISMATCH");
+            Assert.Equal(0, verdicts.Values.Count(v => v == FitVerdict.NoProfile), "NO_PROFILE");
         });
 
-        runner.Check("the four profiled recipes each report 24 exact / 25 normalised", () =>
+        // Every recipe is judged against the table its own CSV row names. The BR plans
+        // are 32 steps of which 25 survive normalisation; SQ has 15 rows but 14 distinct
+        // names, and SQGW is the variant-B outlier (11 exact of 14).
+        runner.Check("every profiled recipe is judged against its own table", () =>
         {
-            foreach (var (stem, table) in new[]
+            var expected = new (string Stem, string Table, int Exact, int Normalised)[]
             {
-                ("P_TM_BRI9_B_07_4_32", "Std_02_ST_TO247.xlsx"),
-                ("P_TM_BRJ7_B_07_4_32", "Std_02_ST_TO247.xlsx"),
-                ("P_TM_BRJJ_B_09_4_32", "Std_07_ST_1200V.xlsx"),
-                ("P_TM_BRF9_B_05_4_32", "Std_02b_ST_BRF9.xlsx"),
-            })
+                ("P_TM_BR9M_B_05_4_32", "Std_10_BR9M_B.xlsx", 24, 25),
+                ("P_TM_BRF5_B_07_4_32", "Std_06_BRF5_B.xlsx", 24, 25),
+                ("P_TM_BRF7_B_07_4_32", "Std_07_BRF7_B.xlsx", 24, 25),
+                ("P_TM_BRF9_B_05_4_32", "Std_08_BRF9_B.xlsx", 24, 25),
+                ("P_TM_BRFC_B_05_4_32", "Std_09_BRFC_B.xlsx", 24, 25),
+                ("P_TM_BRI9_B_07_4_32", "Std_11_BRI9_B.xlsx", 24, 25),
+                ("P_TM_BRIC_B_05_4_32", "Std_12_BRIC_B.xlsx", 24, 25),
+                ("P_TM_BRIG_B_04_4_32", "Std_13_BRIG_B.xlsx", 24, 25),
+                ("P_TM_BRJ7_B_07_4_32", "Std_14_BRJ7_B.xlsx", 24, 25),
+                ("P_TM_BRJJ_B_09_4_32", "Std_15_BRJJ_B.xlsx", 24, 25),
+                ("P_TM_BRJO_B_06_4_32", "Std_16_BRJO_B.xlsx", 24, 25),
+                ("P_TM_SQFJ_B_03_4_5", "Std_17_SQFJ_B.xlsx", 14, 14),
+                ("P_TM_SQGW_B_02_4_5", "Std_18_SQGW_B.xlsx", 11, 14),
+                ("P_TM_SQJJ_B_03_4_5", "Std_19_SQJJ_B.xlsx", 14, 14),
+                ("P_TM_SQK9_B_03_4_5", "Std_20_SQK9_B.xlsx", 14, 14),
+                ("P_TM_SQKC_B_03_4_5", "Std_21_SQKC_B.xlsx", 14, 14),
+                ("P_TM_SQKW_B_03_4_5", "Std_22_SQKW_B.xlsx", 14, 14),
+            };
+
+            Assert.Equal(17, expected.Length, "profiled recipes");
+            foreach (var (stem, table, exact, normalised) in expected)
             {
                 var result = delivery.Fit(stem);
                 Assert.Equal(table, result.TableFile, $"{stem} table");
-                Assert.Equal(24, result.MatchedExact, $"{stem} exact matches");
-                Assert.Equal(25, result.MatchedNormalised, $"{stem} normalised matches");
+                Assert.Equal(exact, result.MatchedExact, $"{stem} exact matches");
+                Assert.Equal(normalised, result.MatchedNormalised, $"{stem} normalised matches");
             }
         });
 
@@ -302,14 +326,21 @@ internal static class RealDataTests
                 var suggestion = FitChecker.SuggestTable(recipe, delivery.AllTables());
                 Assert.True(suggestion.Table is null, $"{recipe.FileStem} was offered {suggestion.Table}");
                 Assert.Equal(14, suggestion.Steps, $"{recipe.FileStem} distinct step names");
-                Assert.Equal("Std_02b_ST_BRF9.xlsx", suggestion.Closest ?? "", $"{recipe.FileStem} closest table");
-                Assert.Equal(9, suggestion.ClosestHits, $"{recipe.FileStem} closest hits");
 
-                var notes = delivery.Fit(recipe.FileStem).Notes;
-                Assert.True(notes.Any(n => n.Contains("not that one", StringComparison.Ordinal)),
-                    string.Join(" | ", notes));
-                Assert.True(!notes.Any(n => n.Contains("covers every step", StringComparison.Ordinal)),
-                    string.Join(" | ", notes));
+                // The rule is about families, not about which table happens to score
+                // highest: an SQ program must never be measured against a SiC part's
+                // limits and bins. Pin the family, not the file name, so adding a
+                // table cannot make this fail for the wrong reason.
+                Assert.True((suggestion.Closest ?? "").Contains("_SQ", StringComparison.Ordinal),
+                    $"{recipe.FileStem} closest table is {(suggestion.Closest ?? "-")}, not an SQ table");
+
+                // Since 2026-11-01 each SQ program has a profile row of its own, so the
+                // fallback is never reached for STM at all - which is the stronger
+                // version of the same rule.
+                var profile = ProfileCsvAdapter.Find(delivery.ProfileRows, recipe.FileStem);
+                Assert.True(profile is not null, $"{recipe.FileStem} has no profile row");
+                Assert.True(profile!.StdTable.Contains("_SQ", StringComparison.Ordinal),
+                    $"{recipe.FileStem} points at {profile.StdTable}");
             }
         });
     }

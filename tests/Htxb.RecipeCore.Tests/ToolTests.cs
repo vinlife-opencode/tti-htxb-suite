@@ -20,9 +20,6 @@ namespace Htxb.RecipeCore.Tests;
 /// </summary>
 internal static class ToolTests
 {
-    /// <summary>The tables the site runs with; falls back to the tracked fixture.</summary>
-    public static string TablesRoot(string fixtureRoot) =>
-        Directory.Exists(TestPaths.InstalledTables) ? TestPaths.InstalledTables : fixtureRoot;
 
     public static void Register(Runner runner, string samplesRoot, string zadzRoot, string tablesRoot)
     {
@@ -224,7 +221,7 @@ internal static class ToolTests
 
     // ---------------------------------------------------------------- std-align
 
-    private static void RegisterAligned(Runner runner, string samplesRoot, string zadzRoot, string fixtureRoot)
+    private static void RegisterAligned(Runner runner, string samplesRoot, string zadzRoot, string tables)
     {
         if (!Directory.Exists(samplesRoot) || !Directory.Exists(zadzRoot))
         {
@@ -232,8 +229,7 @@ internal static class ToolTests
             return;
         }
 
-        string tables = TablesRoot(fixtureRoot);
-        string? profileCsv = ProfileCsvAdapter.PathForTables(tables) is { } csv && File.Exists(csv) ? csv : null;
+                string? profileCsv = ProfileCsvAdapter.PathForTables(tables) is { } csv && File.Exists(csv) ? csv : null;
         if (profileCsv is null)
         {
             runner.Skip("std-align parity", $"profile CSV not found under {tables}");
@@ -379,10 +375,9 @@ internal static class ToolTests
         return null;
     }
 
-    private static void RegisterValidate(Runner runner, string samplesRoot, string fixtureRoot)
+    private static void RegisterValidate(Runner runner, string samplesRoot, string tables)
     {
-        string tables = TablesRoot(fixtureRoot);
-        string? profileCsv = ProfileCsvAdapter.PathForTables(tables) is { } csv && File.Exists(csv) ? csv : null;
+                string? profileCsv = ProfileCsvAdapter.PathForTables(tables) is { } csv && File.Exists(csv) ? csv : null;
 
         var post = FindPostRun(samplesRoot);
 
