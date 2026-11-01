@@ -1536,3 +1536,34 @@ Reinstalled 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities` as
 binary carries the canvas-print code (`prepareChartsForPrint`) with no trace of the image snapshot.
 The two superseded setups (`..._V6.11.011.exe`, `..._V6.11.012.exe` - the latter being the release
 whose charts printed blank) were deleted so only the current one remains.
+
+## 2026-11-01 - P2 Data Analysis - Time V6.11.014: step chart split into separate A and B graphs
+
+Request: "Preset vs actual - per test step / Split Graph A and B separately. Print Graph A and B
+separately."
+
+Before: one chart fed by a single selector listing A and B runs together, so A and B could only be
+looked at one at a time and never side by side - neither on screen nor on paper.
+
+Now: two charts, "Preset vs actual - per test step - A reference" and "... - B candidate", drawn
+from two folder-scoped selectors (`step-run-a` / `step-run-b` -> `runs.A` / `runs.B`). Both charts
+share one y maximum (`stepSeriesMax` over both runs) so the A and B bars are read against the same
+scale - that comparison is the whole reason to split them. A folder without a loaded run draws an
+empty frame instead of a blank card, so the printed report always shows both slots.
+
+Print: the two cards sit in a `.grid-2` that the print stylesheet stacks, so each graph prints on
+its own full-width row. The "Trend - Sigma actual per slot" chart moved out of that grid into its
+own full-width card (it had been sharing the row with the step chart).
+
+Verified with a real PDF (probe page carrying the real page CSS, the real `polyfill.js` and the
+bundled Chart.js 4.4.1, printed by headless Edge `--print-to-pdf`): 2 pages, 94,180 bytes - Graph A
+and Graph B stacked full width on page 1, the slot and deviation trend charts on page 2, nothing
+blank or clipped. Inline script validated with esprima (1 block, 84,200 chars, OK).
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.P2DataAnalysisTime/Resources/index.html` | Step chart split into `chart-steps-a` / `chart-steps-b`; `charts` -> `{stepsA, stepsB, slots, trend}`; `fillRunSelectors` fills per-folder and combined lists; new `selectedRunIn`, `stepSeries`, `stepSeriesMax`, `drawStepChartFor`; slots chart given its own card. |
+| modified | `src/Htxb.P2DataAnalysisTime/Resources/polyfill.js` | `EXE_VERSION` -> `V6.11.014`. |
+| modified | `src/Htxb.P2DataAnalysisTime/Htxb.P2DataAnalysisTime.csproj` | `Version` + `FileVersion` -> `6.11.14.0`. |
+| modified | `.data2/manifest.json` | `p2-analysis-time` -> `6.11.14.0`. |
+| release | `installer/out/TTI_Utilities_Setup_V6.11.014.exe` | Built and installed to `C:\TTI_PostDataProcessor\_TTI_Utilities` (registered "TTI Tools & Utilities V6.11.014"); superseded `_V6.11.013.exe` setup deleted. |

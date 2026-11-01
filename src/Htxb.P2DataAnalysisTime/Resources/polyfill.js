@@ -1,4 +1,4 @@
-// TTI P2 Data Analysis - Time  (EXE polyfill, V6.11.013)
+// TTI P2 Data Analysis - Time  (EXE polyfill, V6.11.014)
 // Part A: header version badge sync (UI display rule: header == cover page).
 // Part B: offline Excel export shim - XLSX.writeFile() relies on browser download
 //   support, which WebView2 does not expose like Chrome. Re-route through the
@@ -14,7 +14,7 @@
 (function () {
   'use strict';
 
-  var EXE_VERSION = 'V6.11.013';
+  var EXE_VERSION = 'V6.11.014';
 
   // --- Part A: header version badge -----------------------------------------
   function applyExeVersion() {

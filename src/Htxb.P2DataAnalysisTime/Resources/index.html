@@ -260,15 +260,22 @@
 
       <div class="grid-2">
         <div class="chart-card">
-          <div class="section-title"><span>Preset vs actual &mdash; per test step</span>
-            <select class="inline-select no-print" id="step-run" onchange="drawStepChart()"></select>
+          <div class="section-title"><span>Preset vs actual &mdash; per test step &mdash; <b>A</b> reference</span>
+            <select class="inline-select no-print" id="step-run-a" onchange="drawStepChart()"></select>
           </div>
-          <div class="chart-box"><canvas id="chart-steps"></canvas></div>
+          <div class="chart-box"><canvas id="chart-steps-a"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="section-title"><span>Trend &mdash; &Sigma;actual per slot, A vs B</span></div>
-          <div class="chart-box"><canvas id="chart-slots"></canvas></div>
+          <div class="section-title"><span>Preset vs actual &mdash; per test step &mdash; <b>B</b> candidate</span>
+            <select class="inline-select no-print" id="step-run-b" onchange="drawStepChart()"></select>
+          </div>
+          <div class="chart-box"><canvas id="chart-steps-b"></canvas></div>
         </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="section-title"><span>Trend &mdash; &Sigma;actual per slot, A vs B</span></div>
+        <div class="chart-box"><canvas id="chart-slots"></canvas></div>
       </div>
 
       <div class="chart-card">
@@ -332,7 +339,7 @@
 
   var runs = { A: [], B: [] };      // [{ slot, name, path, identity, summary, steps, flags }]
   var thresholds = { step: 2.0, run: 1.0 };
-  var charts = { steps: null, slots: null, trend: null };
+  var charts = { stepsA: null, stepsB: null, slots: null, trend: null };
   var pairMode = 'bib';             // 'bib' | 'order'
 
   // ---------------------------------------------------------------- utils
@@ -1650,20 +1657,35 @@
 
   // ------------------------------------------------------------ charting
   function fillRunSelectors() {
-    var all = [];
-    runs.A.forEach(function (r, i) { all.push({ label: 'A' + (i + 1) + ' \u00b7 ' + r.name, r: r }); });
-    runs.B.forEach(function (r, i) { all.push({ label: 'B' + (i + 1) + ' \u00b7 ' + r.name, r: r }); });
-    ['step-run', 'detail-run'].forEach(function (id) {
-      var sel = $(id);
+    // The "Preset vs actual" chart is now one per folder, so each selector lists
+    // only its own folder; the test-step detail table keeps the combined A+B list.
+    function fillFolder(sel, list, slot) {
       var keep = sel.value;
       sel.innerHTML = '';
-      all.forEach(function (o, i) {
+      list.forEach(function (r, i) {
         var opt = document.createElement('option');
-        opt.value = String(i); opt.textContent = o.label;
+        opt.value = String(i);
+        opt.textContent = slot + (i + 1) + ' \u00b7 ' + r.name;
         sel.appendChild(opt);
       });
-      if (keep && all[+keep]) sel.value = keep;
-    });
+      if (keep !== '' && list[+keep]) sel.value = keep;
+    }
+    function fillCombined(sel) {
+      var all = runs.A.concat(runs.B);
+      var keep = sel.value;
+      sel.innerHTML = '';
+      all.forEach(function (r, i) {
+        var isA = i < runs.A.length;
+        var opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = (isA ? 'A' : 'B') + (isA ? i + 1 : i - runs.A.length + 1) + ' \u00b7 ' + r.name;
+        sel.appendChild(opt);
+      });
+      if (keep !== '' && all[+keep]) sel.value = keep;
+    }
+    fillFolder($('step-run-a'), runs.A, 'A');
+    fillFolder($('step-run-b'), runs.B, 'B');
+    fillCombined($('detail-run'));
   }
 
   function selectedRun(id) {
@@ -1672,30 +1694,55 @@
     return all[idx] || null;
   }
 
+  function selectedRunIn(slot, id) {
+    var idx = parseInt($(id).value, 10);
+    var list = runs[slot] || [];
+    return list[idx] || null;
+  }
+
   function chartColors(a, b) {
     return { a: a, b: b };
   }
 
-  function drawStepChart() {
-    var r = selectedRun('step-run');
-    if (!r || !window.Chart) return;
-    if (charts.steps) charts.steps.destroy();
-    var labels = r.steps.map(function (s, i) {
-      var nm = String(s.name || '').trim();
-      return (s.test_index === null || s.test_index === '' ? (i + 1) : s.test_index) + (nm ? ' \u00b7 ' + nm : '');
-    });
-    var setData = r.steps.map(function (s) { return s.set === null ? null : +(s.set / 60).toFixed(3); });
-    var actData = r.steps.map(function (s) { return s.actual === null ? null : +(s.actual / 60).toFixed(3); });
-    var tsData = r.steps.map(function (s) { return s.tsDelta === null ? null : +(s.tsDelta / 60).toFixed(3); });
+  // One run's per-step series, in minutes.
+  function stepSeries(r) {
+    return {
+      labels: r.steps.map(function (s, i) {
+        var nm = String(s.name || '').trim();
+        return (s.test_index === null || s.test_index === '' ? (i + 1) : s.test_index) + (nm ? ' \u00b7 ' + nm : '');
+      }),
+      set: r.steps.map(function (s) { return s.set === null ? null : +(s.set / 60).toFixed(3); }),
+      act: r.steps.map(function (s) { return s.actual === null ? null : +(s.actual / 60).toFixed(3); }),
+      ts: r.steps.map(function (s) { return s.tsDelta === null ? null : +(s.tsDelta / 60).toFixed(3); })
+    };
+  }
 
-    charts.steps = new Chart($('chart-steps').getContext('2d'), {
+  function stepSeriesMax(d) {
+    var m = 0;
+    ['set', 'act', 'ts'].forEach(function (k) {
+      d[k].forEach(function (v) { if (v !== null && v > m) m = v; });
+    });
+    return m;
+  }
+
+  function drawStepChartFor(key, canvasId, slot, run, suggestedMax) {
+    if (charts[key]) { charts[key].destroy(); charts[key] = null; }
+    if (!window.Chart) return;
+    // No run in that folder: draw the empty frame rather than leaving the card
+    // blank, so the printed report still shows the A and B slots exist.
+    var d = run ? stepSeries(run) : { labels: ['no run in folder ' + slot], set: [null], act: [null], ts: [null] };
+    var title = run
+      ? 'Folder ' + slot + ' \u00b7 ' + run.name + (hasNoPreset(run) ? '  (no preset time in this revision)' : '')
+      : 'Folder ' + slot + ' \u00b7 no run';
+
+    charts[key] = new Chart($(canvasId).getContext('2d'), {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: d.labels,
         datasets: [
-          { label: 'Preset (exec_set)', data: setData, backgroundColor: 'rgba(0,103,192,0.55)', borderColor: 'rgba(0,103,192,0.9)', borderWidth: 1 },
-          { label: 'Actual (exec_time)', data: actData, backgroundColor: 'rgba(212,53,28,0.55)', borderColor: 'rgba(212,53,28,0.9)', borderWidth: 1 },
-          { label: 'Actual (end \u2212 start)', data: tsData, type: 'line', borderColor: 'rgba(16,124,65,0.85)',
+          { label: 'Preset (exec_set)', data: d.set, backgroundColor: 'rgba(0,103,192,0.55)', borderColor: 'rgba(0,103,192,0.9)', borderWidth: 1 },
+          { label: 'Actual (exec_time)', data: d.act, backgroundColor: 'rgba(212,53,28,0.55)', borderColor: 'rgba(212,53,28,0.9)', borderWidth: 1 },
+          { label: 'Actual (end \u2212 start)', data: d.ts, type: 'line', borderColor: 'rgba(16,124,65,0.85)',
             backgroundColor: 'rgba(16,124,65,0.12)', pointRadius: 3, borderWidth: 2, tension: 0.25, spanGaps: true }
         ]
       },
@@ -1704,14 +1751,28 @@
         plugins: {
           legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
           tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + (c.parsed.y === null ? '\u2014' : c.parsed.y + ' min'); } } },
-          title: { display: true, text: r.name + (hasNoPreset(r) ? '  (no preset time in this revision)' : ''), font: { size: 11, weight: 'normal' } }
+          title: { display: true, text: title, font: { size: 11, weight: 'normal' } }
         },
         scales: {
           x: { ticks: { font: { size: 9 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
-          y: { title: { display: true, text: 'minutes', font: { size: 10 } }, ticks: { font: { size: 10 } } }
+          // Both charts get the same maximum so A and B can be read against each
+          // other; comparing the two runs is the whole point of splitting them.
+          y: { suggestedMax: suggestedMax || undefined,
+               title: { display: true, text: 'minutes', font: { size: 10 } }, ticks: { font: { size: 10 } } }
         }
       }
     });
+  }
+
+  // "Preset vs actual - per test step": folder A and folder B as two separate
+  // graphs (and two separate graphs in the printed report), instead of one chart
+  // fed by a single A-or-B selector.
+  function drawStepChart() {
+    var ra = selectedRunIn('A', 'step-run-a');
+    var rb = selectedRunIn('B', 'step-run-b');
+    var shared = Math.max(ra ? stepSeriesMax(stepSeries(ra)) : 0, rb ? stepSeriesMax(stepSeries(rb)) : 0);
+    drawStepChartFor('stepsA', 'chart-steps-a', 'A', ra, shared);
+    drawStepChartFor('stepsB', 'chart-steps-b', 'B', rb, shared);
   }
 
   function drawSlotChart() {
@@ -2075,7 +2136,8 @@
     });
     $('pick-row').classList.remove('compact');
     $('preset-bar').style.display = 'none';
-    if (charts.steps) { charts.steps.destroy(); charts.steps = null; }
+    if (charts.stepsA) { charts.stepsA.destroy(); charts.stepsA = null; }
+    if (charts.stepsB) { charts.stepsB.destroy(); charts.stepsB = null; }
     if (charts.slots) { charts.slots.destroy(); charts.slots = null; }
     if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
     $('dash').style.display = 'none';

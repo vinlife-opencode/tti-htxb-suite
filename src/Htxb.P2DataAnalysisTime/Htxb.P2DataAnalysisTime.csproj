@@ -8,8 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Htxb.P2DataAnalysisTime</RootNamespace>
     <AssemblyName>Htxb.P2DataAnalysisTime</AssemblyName>
-    <Version>6.11.13.0</Version>
-    <FileVersion>6.11.13.0</FileVersion>
+    <Version>6.11.14.0</Version>
+    <FileVersion>6.11.14.0</FileVersion>
     <ApplicationIcon>Resources\Favicon.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
   </PropertyGroup>
