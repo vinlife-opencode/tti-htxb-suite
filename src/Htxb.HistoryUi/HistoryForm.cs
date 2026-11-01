@@ -208,7 +208,7 @@ internal sealed class HistoryForm : Form
                 lot.RecipeInProfile,
                 lot.Outputs,
                 lot.State,
-                lot.Note);
+                Note(lot));
 
             DataGridViewRow row = _grid.Rows[index];
             row.Tag = lot;
@@ -231,6 +231,23 @@ internal sealed class HistoryForm : Form
                         $"{_lots.Count(l => l.Outputs == "report-only")} without a BiDF  -  " +
                         $"{_lots.Count(l => l.State == "not processed")} not processed";
         UpdateRecoverButton();
+    }
+
+    /// <summary>
+    /// The Note column: first the machine id this lot carries, then whatever else the
+    /// scanner had to say. The report's Machine ID is the site id the lot's own RPT
+    /// was written with - the machine that RAN it, which is not the machine the file
+    /// now sits on when a lot was copied in. The vendor id from the log follows in
+    /// brackets when it is a different value.
+    /// </summary>
+    private static string Note(LotHistory lot)
+    {
+        string machine = lot.Site.Length > 0 ? lot.Site
+            : lot.Machine.Length > 0 ? lot.Machine : "unknown";
+        string text = $"machine {machine}";
+        if (lot.Machine.Length > 0 && !string.Equals(lot.Machine, machine, StringComparison.Ordinal))
+            text += $" (log {lot.Machine})";
+        return lot.Note.Length > 0 ? $"{text}; {lot.Note}" : text;
     }
 
     private void UpdateRecoverButton() =>
