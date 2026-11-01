@@ -232,18 +232,15 @@ public static class LotScanner
 
         // The report ours wrote carries the site id that was configured when the lot
         // ran. Prefer it: that is literally "the site id our report writes", and it
-        // is right even when the setting has been changed since.
+        // is right even when the setting has been changed since. The disagreement is
+        // resolved here and deliberately not written into the note - the note is for
+        // what is wrong with THIS lot, not for a site setting that has drifted.
         string site = configSite;
         if (hasFinal)
         {
             string? rpt = FirstSlotFile(finalPath, "*_Rpt.xlsx");
             string reported = rpt is null ? string.Empty : SiteIdFromReport(rpt);
-            if (reported.Length > 0)
-            {
-                if (configSite.Length > 0 && !string.Equals(configSite, reported, StringComparison.Ordinal))
-                    notes.Add($"config.toml says {configSite}; the report says {reported}");
-                site = reported;
-            }
+            if (reported.Length > 0) site = reported;
         }
         else
         {
@@ -253,12 +250,7 @@ public static class LotScanner
             // every other file in the same folder.
             string? anyReport = FirstReportAnywhere(options.FinalDirectory);
             string reported = anyReport is null ? string.Empty : SiteIdFromReport(anyReport);
-            if (reported.Length > 0)
-            {
-                if (configSite.Length > 0 && !string.Equals(configSite, reported, StringComparison.Ordinal))
-                    notes.Add($"site id taken from another lot's report ({reported}); config.toml says {configSite}");
-                site = reported;
-            }
+            if (reported.Length > 0) site = reported;
         }
 
         string inProfile = "no";

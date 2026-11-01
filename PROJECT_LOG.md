@@ -1354,3 +1354,71 @@ Measured on the site: 22 archive folders -> 21 report files (one duplicate folde
 9 report-only, 3 not processed**. The nine report-only lots are the recovery list: BRJJ x6 and
 SQFJ x3, every one Completed, whose recipes are rows 15 and 17 of the current CSV.
 `test-recipetool.ps1` -> 98 passed, 0 failed, 0 skipped (was 87).
+## 2026-11-01 - tool windows narrower than a quarter of the screen - V6.11.011
+
+Every tool opened at a fixed 1280x900 (1120 for P2 - Time), i.e. 67% of a 1920-wide work
+area, so a launched tool covered almost everything behind it. New rule: a window whose
+width would exceed **25% of the primary screen's working-area width** is trimmed
+**horizontally by 40%**; **height is never changed**.
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.Host/HostForm.cs` | `TrimOversizeWidth()` runs in the constructor after the default `Size`/`MinimumSize` and before the centring logic, so the window both shrinks and re-centres. |
+| modified | `src/Htxb.Host/HostOptions.cs` | `ShrinkOversizeWidth` (default `true`) - the opt-out switch. |
+| modified | `src/Htxb.Launcher/MainForm.cs` | `ShrinkOversizeWidth = false`: the launcher's 460 px strip is deliberate. |
+| modified | `src/Htxb.{LotExtractor,TempUniformity,BiDFAnalysis,RecipeTranslator,RcpStdTable,P2DataAnalysis,P2DataAnalysisTime,BarcodeGenerator}/*.csproj` | `Version` + `FileVersion` -> `6.11.11.0` (V6.11.011). |
+| modified | `.data2/manifest.json` | Same eight tool ids -> `6.11.11.0`; `generated` -> 2026-11-01. |
+
+The minimum width has to be reduced **before** `Size` is assigned: WinForms clamps `Form.Size`
+straight back up to `Form.MinimumSize`, so every tool keeping the default 960 px minimum would
+have swallowed the trim and looked unchanged.
+
+Measured on this machine (working area 1920x1040, so the 25% line is 480 px):
+
+| Tool | Before | After |
+|---|---|---|
+| Lot Extractor, Temp Uniformity, BiDF Analysis, Recipe Translator, Recipe-to-Std Table, P2 Data Analysis | 1280x900 | **768x900** |
+| P2 Data Analysis - Time | 1120x900 | **672x900** |
+| Barcode Generator | 660x640 | **396x640** |
+| Tools & Utilities (launcher) | 460 x full working-area height | unchanged (opted out) |
+
+The launcher opts out on purpose: on a 1366-wide screen its 460 px strip is 34% and would have
+been treated as "oversize" and cut to 276, breaking the corner-tab design. `Htxb.RecipeTool` is
+untouched - it is a console audit tool and does not build a `HostForm`.
+
+## 2026-11-01 - restricted tools on the launcher + a real installer - V6.11.011
+
+Launcher (V6.11.011): three cards - **Lot Extractor**, **Recipe Translator**,
+**Recipe-to-Std Table** - now start **compressed**: a one-line bar (dashed border, lock
+glyph, name only). Clicking the bar asks for the admin passphrase; a correct one expands
+the card and opens the tool for that launcher session. Any other card is unchanged.
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.Launcher/Resources/polyfill.js` | `RESTRICTED` href set, compressed-bar CSS injected at runtime, passphrase dialog (built once, re-wired per card), click interceptor unlocks instead of launching. |
+| modified | `src/Htxb.Launcher/Htxb.Launcher.csproj` | `Version` + `FileVersion` -> `6.11.11.0`. |
+| modified | `.data2/manifest.json` | `launcher` -> `6.11.11.0`. |
+| created | `installer/installer.iss` | Inno Setup 6 script, modeled on `_Proj_BidfGen2\deploy\installer.iss`: payload = `dist\`, install dir `C:\TTI_PostDataProcessor\_TTI_Utilities`, site settings seeded `onlyifdoesntexist`. |
+| created | `build-installer.ps1` | Finds ISCC, checks `dist\` has 9 EXEs and a matching manifest, builds the setup, and with `-Reinstall` uninstalls the old copy then installs silently. |
+| modified | `.gitignore` | `installer/out/` (build artefact). |
+
+Only the **SHA-256 digest** of the passphrase is embedded (lower-cased, trimmed), never the
+passphrase itself. It is an operator speed bump, not a security control - the polyfill is
+readable inside the EXE, and the unlock is per launcher session (a restart re-compresses).
+
+Installed 2026-11-01 to `C:\TTI_PostDataProcessor\_TTI_Utilities`:
+
+* setup `installer\out\TTI_Utilities_Setup_V6.11.011.exe` (3.5 MB, lzma2, machine-wide,
+  registered as "TTI Tools & Utilities V6.11.011");
+* the previous hand-copied folder there had **no uninstaller**, so `-Reinstall` moved it to
+  `_TTI_Utilities.bak-20261101-134643` rather than deleting a possible site `configuration\`
+  or custom `data2\assets\dut_package` images;
+* all nine EXEs verified at `6.11.11.0` after install.
+
+### 2026-11-01 - the note stops carrying the site-setting drift
+
+| Type | Paths | Summary |
+|---|---|---|
+| modified | `src/Htxb.RecipeCore/History/LotScanner.cs` | The two notes about `config.toml` disagreeing with the report are gone. The site id is still resolved the same way (our RPT first, then another lot's report, then the config), but the note column is for what is wrong with *that lot* - a drifted site setting is not lot information and it filled the column on every row. |
+
+Measured: the 21 reports in `4_Log_Processed_History` regenerated, `note` empty on all of them, site `TTSZ-2101` on all, and no file mentions the local id.
